@@ -1,21 +1,23 @@
 # 服务器当前状态
 
-本页面向 Web ChatGPT。核验主体为本地 Codex，来源为专用普通账号的直接 SSH 读取、本机 Windows 只读检查，以及用户提供的 Web 交接说明。
+本页面向 Web ChatGPT。核验主体为本地 Codex，来源分为专用普通账号的直接 SSH 读取、本机 Windows 只读检查、用户返回的管理员实际命令输出，以及待核验的 Web 历史摘要。
 
 核验日期：2026-10-21（Asia/Shanghai）；首轮服务器报告时间为 23:25:55。服务器自报 NTP 已启用、已同步，宿主机时区为 UTC。以下是该轮检查的快照，不代表持续监测。
 
+用户于同日返回了任务 002 的管理员检查结果，命令执行的精确时间未提供；下文注明来源，不能把文件修改时间当作命令执行时间。用户明确要求 DDNS 保持调试中，本轮后续工作聚焦其他运维内容。
+
 ## 已核实的基础状态
 
-| 项目 | Verified：本轮直接核实 |
+| 项目 | Verified：证据来源逐项说明 |
 |---|---|
 | 系统 | Ubuntu 26.04.1 LTS；Linux 7.0.0-38-generic，x86_64 |
 | CPU / 内存 | AMD Ryzen 5 3600，6 核 12 线程；约 16GB RAM（`free` 显示 15Gi），4Gi swap |
-| 内网 | `enp34s0` 为 `192.168.1.110/24`，默认网关 `192.168.1.1` |
+| 内网 | 直接读取运行状态为 `192.168.1.110/24`、默认网关 `192.168.1.1`；用户管理员摘要确认 Netplan 中 dhcp4=false、固定地址和网关均符合预期，dhcp6=true，accept-ra 未显式配置 |
 | IPv6 | 网卡有 global scope IPv6 地址，但尚未测试公网可达性或 DDNS；真实地址不公开 |
-| 宿主机服务 | Docker、containerd、SSH 为 active/running；UFW unit 为 active/exited，不能据此认定实际规则已验收 |
-| Docker 客户端 | Docker 29.9.1、Compose v5.6.0；守护进程运行参数和容器明细待管理员验证 |
+| 宿主机服务 | 直接读取 Docker、containerd、SSH 为 active/running；UFW unit 为 active/exited，实际用户规则另由管理员输出补齐 |
+| Docker | 客户端 Docker 29.9.1、Compose v5.6.0；用户管理员输出确认运行时 data-root、snapshotter、代理及三项容器参数，详见下文 |
 | TCP 监听 | 22、80 有非回环监听；13002、19876、2019 为回环监听；本轮未发现 TCP 443 监听 |
-| 系统更新 | APT 配置启用了每日索引更新和 unattended-upgrade，相关 timer 存在；未核实近期升级记录、源范围或回滚机制 |
+| 系统更新 | APT 配置启用了每日索引更新和 unattended-upgrade，相关 timer 存在，允许来源见下文；未核实近期升级记录或回滚机制 |
 
 监听状态不等于防火墙放行，也不等于公网可达。路由器的型号、DHCP 池及端口映射仍仅有历史描述。
 
@@ -34,7 +36,7 @@
 已读取的配置事实：
 
 - `/etc/fstab` 将上述 UUID 挂载到 `/srv/docker-data`，选项为 `defaults,nofail,x-systemd.device-timeout=10s`。
-- `/etc/docker/daemon.json` 声明 data-root 为 `/srv/docker-data/engine/docker`、日志驱动为 `local`；本次读取的文件没有显式 `features.containerd-snapshotter` 配置，运行时存储驱动不能靠历史描述认定。
+- `/etc/docker/daemon.json` 声明 data-root 为 `/srv/docker-data/engine/docker`、日志驱动为 `local`。用户返回的 `docker info` 进一步确认实际 data-root 相同，Driver 为 `overlayfs`，DriverStatus 为 `io.containerd.snapshotter.v1`；文件中没有显式 features 开关不代表该运行时功能未启用。实际日志驱动未在本次管理员输出中查询。
 - `/etc/containerd/config.toml` 为 v4，root 为 `/srv/docker-data/engine/containerd`，state 为 `/run/containerd`。
 - Docker 和 containerd 的 drop-in 均有 `RequiresMountsFor`、`AssertPathIsMountPoint`，并在启动前调用 `/usr/local/sbin/verify-docker-data-disk`。
 - 已读取该检查脚本源码：校验挂载点和 UUID，不匹配时退出失败。未执行该脚本、重启服务、移除磁盘或进行故障注入。
@@ -43,13 +45,15 @@
 
 ## 应用与 DDNS
 
-以下 Compose 内容只代表磁盘上的部署声明。没有 Docker API 权限，尚不能确认容器实际使用的镜像、重启策略、挂载和端口是否与声明完全一致。
+本地监督者仍无 Docker API 权限；以下实际容器参数依据用户返回的 `docker ps -a` 和选择性 `docker inspect`，不是监督者直接调用 Docker API 获得。三项容器均为 running、重启策略均为 unless-stopped。
 
-| 应用 | 已读配置 | 直接 HTTP / 监听证据 |
+| 应用 | 配置与用户管理员运行时证据 | 直接 HTTP / 监听证据 |
 |---|---|---|
-| Caddy | `/srv/apps/caddy/compose.yaml`：`caddy:2.11.4-alpine`、host 网络、unless-stopped；Caddyfile 只读挂载，状态目录在 `/srv/persistent/data/caddy/` | LAN 根路径返回 200；80 和回环 2019 有监听 |
-| ddns-go | `/srv/apps/ddns-go/compose.yaml`：`ghcr.io/jeessy2/ddns-go:v6.17.7`、unless-stopped、`127.0.0.1:19876:9876`、只读根文件系统；秘密配置目录挂载到 `/root`；参数为配置路径、监听 `:9876`、间隔 300 秒，TZ 为 Asia/Shanghai | 后端根路径返回 307 到 `/login`；LAN `/ddns-go/` 返回 307 到 `/ddns-go/login`，该登录页返回 200 |
-| Tududi | `/srv/apps/tududi` 不可进入，Compose 和数据库不可读取；镜像 1.9.5、健康状态和备份文件目前仅有历史描述 | `127.0.0.1:13002/` 和经 Caddy 的 LAN 根路径均返回 200；HTTP 响应不能证明容器健康检查状态或数据库可恢复 |
+| Caddy | 已读 Compose 与管理员实际参数一致：`caddy:2.11.4-alpine`、host 网络；Caddyfile 只读挂载，`/data`、`/config` 可写绑定到 `/srv/persistent/data/caddy/`；未配置健康检查 | LAN 根路径返回 200；80 和回环 2019 有监听 |
+| ddns-go | 已读 Compose 与用户返回的实际镜像、端口和配置目录挂载一致；`ghcr.io/jeessy2/ddns-go:v6.17.7`，`127.0.0.1:19876:9876`，`/root` 为可写 bind；未配置健康检查。Compose 另外声明只读根文件系统、300 秒间隔和 Asia/Shanghai 时区，这几项未在运行时 inspect 中单独核对 | 保留上一轮匿名页面及资源的 HTTP 结果；功能仍调试中，不继续排查或宣称验收通过 |
+| Tududi | 用户管理员输出：`chrisvel/tududi:1.9.5`、healthy、`127.0.0.1:13002:3002`，网络 `tududi_default`；`/app/db`、`/app/uploads` 分别可写绑定到 `/srv/persistent/data/tududi/db` 和 `uploads`，`/app/backups` 另为 Docker volume | `127.0.0.1:13002/` 和经 Caddy 的 LAN 根路径均返回 200；健康检查 healthy 不等于恢复能力已验收 |
+
+未配置健康检查与健康检查失败是不同状态，不能因 Caddy / ddns-go 显示 not-configured 就判断应用故障。
 
 ### DDNS 管理入口已经发生变化
 
@@ -64,16 +68,34 @@
 
 ### DDNS 与公网仍待核验
 
+用户明确说明 DDNS 仍在调试，暂不作为当前监督工作的推进重点。以下未知项保留，待用户交接调试结果后另行验收。
+
 历史交接描述：阿里云域名及 DNS、ddns-go IPv4、RAM 仅查询与更新已有记录，以及 OpenAPI Explorer 的人工测试成功。这些尚未独立复核。
 
 当前仍未知：实际记录名、类型、TTL、DNS 值与家庭公网 IPv4 是否一致、自动更新成功时间、有效 RAM 策略、路由器当前转发及公网 HTTPS 可用性。无需为核验 DDNS 而先开放公网端口。
 
 ## 防火墙与代理
 
-- UFW 可读配置为 `ENABLED=yes`、IPv6 启用、默认入站 DROP / 出站 ACCEPT / 转发 DROP；实际加载的规则及 Docker 转发影响待管理员查询，尚未做端到端防火墙验收。
-- Docker systemd 代理文件声明 HTTP_PROXY / HTTPS_PROXY 为 `http://192.168.1.120:5780`，NO_PROXY 为 `localhost,127.0.0.1,::1,192.168.1.0/24`，未含代理用户名密码；守护进程实际生效值待查询。
+- 用户管理员输出确认 UFW 为 active，默认入站 deny / 出站 allow / 转发 deny；当前显示的用户规则仅允许 `192.168.1.0/24` 到 TCP 22、80，`ufw show added` 与之相符。未检查完整 Docker 转发链或独立做公网探测，不能外推为所有网络路径均已验收。
+- Docker systemd 代理文件声明 HTTP_PROXY / HTTPS_PROXY 为 `http://192.168.1.120:5780`，NO_PROXY 为 `localhost,127.0.0.1,::1,192.168.1.0/24`，未含代理用户名密码；用户返回的 `docker info` 三项匹配结果均为 true，确认守护进程实际生效值符合预期。
 - 本机 Windows 地址为 `192.168.1.120/24`，5780 有 TCP 监听；从服务器连接该端口成功。仅验证 TCP 连通，不代表代理转发或镜像拉取成功，本轮不拉取镜像。
 - Windows 未发现显示名称精确等于 `TEMP-HTTP-Test-18080` 的规则，不能据此排除其他名称的同类规则。
+
+## 数据保护与更新
+
+用户管理员返回的元数据确认：
+
+- Tududi 数据库目录中有 `production.sqlite3`（660），以及对应 WAL / SHM（660）；文件属主均为 eureka。
+- 有 `db-backup-20261021134257.sqlite3` 和 `db-premigrate-20260920000002-make-user-email-nullable.sqlite3` 两份备份类文件（644）。先前直接检查发现其父目录受 750 权限限制，不能仅凭文件 644 就认定全体用户可访问。
+- ddns-go 配置目录为 700，配置文件为 600，属主为 eureka；只验证元数据，没有读取凭据或有效 DNS 设置。
+
+Tududi 的 `/app/backups` 挂载到 Docker data-root 内的一个长哈希名称 volume，位于约 500GB 运行时数据盘；数据库目录中的两份备份类文件位于约 1TB 系统盘。该 volume 的内容、创建来源、是否由应用定时备份，以及是否涵盖 uploads 尚未查明；目前只能确认挂载存在，不能确认其中已有备份。未查清前不能将该卷按“可丢弃运行时数据”处理。
+
+备份存在性已经有证据，但备份一致性、恢复演练、保留策略、离机副本和应用更新回滚仍未验收。数据库目录中存在 WAL；不应将复制单个正在使用的主数据库文件作为已完成的一致性热备份。后续方案需遵循 [SQLite WAL 说明](https://www.sqlite.org/wal.html) 和 [在线备份机制](https://www.sqlite.org/backup.html)，本次未打开数据库或执行备份。
+
+本地只读检查未找到 `/srv/backups`、`/srv/persistent/backups`、`/etc/restic`、`/etc/borg`；`/etc/cron.d` 仅列出占位文件和 e2scrub_all。已见的系统 timer 无明显 Tududi 备份项，但 root / 管理员个人 crontab 和容器内调度尚未读取，不能据此认定没有自动备份。
+
+unattended-upgrades 服务为 active/running，APT 配置允许发行版及 security / ESM 安全来源。是否最近升级成功、自动重启行为、应用镜像更新和回滚流程仍未核实，不将系统包自动升级等同于容器自动更新。
 
 ## 历史决策与计划
 
@@ -87,4 +109,4 @@
 
 ## 当前交接动作
 
-优先完成 [002：历史交接核查与基线建立](../tasks/002-baseline-review.md) 中的管理员只读检查，再决定下一项 Web 执行任务。不要重复应用已经存在的 Caddy 重定向修复。
+[002：历史交接核查与基线建立](../tasks/002-baseline-review.md) 的基础范围已完成，DDNS 按用户要求另行验收。当前优先推进 [003：Tududi 备份范围与调度核查](../tasks/003-tududi-backup-review.md)，先只读查清，不创建、迁移或删除备份，也不重复应用已有的 Caddy 修复。

@@ -1,0 +1,23 @@
+# 本地访问资料与敏感信息
+.ssh/
+.aws/
+secrets/
+credentials/
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
+
+# 运行产物与本地临时文件
+logs/
+backups/
+*.log
+*.tmp
+*.swp
+Thumbs.db
+.DS_Store

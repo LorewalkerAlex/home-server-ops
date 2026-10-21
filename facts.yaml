@@ -1,0 +1,182 @@
+# 已记录的服务器快照，不代表持续监测；这是任务上下文，不是可部署配置。
+updated: "2026-10-22"
+sources:
+  local: {by: 本地 Codex, date: "2026-10-21", method: SSH 只读核验}
+  admin: {by: 用户, received: "2026-10-21—22", method: 管理员命令输出, execution_time: 未提供精确时间}
+  user: {by: 用户, date: "2026-10-22", method: 设计意图确认}
+  history: {by: Web 历史交接, verification: 未独立复核}
+# 各节 source 对应上述来源；pending 为未验证项，intent 为用户设计。
+
+server:
+  source: [local]
+  os: Ubuntu 26.04.1 LTS
+  kernel: 7.0.0-38-generic
+  architecture: x86_64
+  cpu: {model: AMD Ryzen 5 3600, cores: 6, threads: 12}
+  memory: 约 16GB
+  swap: 4Gi
+  timezone: UTC
+  ntp_synchronized_reported: true
+  updates: {apt_automatic: enabled, unattended_upgrades: enabled}
+  pending: [近期自动升级是否成功]
+
+storage:
+  source: [local, user]
+  system_ssd:
+    device: /dev/nvme0n1
+    capacity: 约 1TB
+    root_partition: /dev/nvme0n1p2
+    mount: /
+    intent: 保存系统及重建 Docker 服务所需的配置、业务数据和私密资料
+  runtime_ssd:
+    device: /dev/nvme1n1p1
+    capacity: 约 500GB
+    filesystem: ext4
+    mount: /srv/docker-data
+    uuid: 880cc4e1-3cf0-44cb-aa71-97d0bc3b15a5
+    intent: 保存镜像等可重建的 Docker 运行时内容
+    mount_protection:
+      fstab: {nofail: true, device_timeout: 10s}
+      startup: Docker 和 containerd 依赖挂载，并校验 UUID
+      pending: [缺盘故障测试]
+  hdd:
+    device: /dev/sda
+    capacity: 约 3TB
+    partitions_observed: 2
+    mountpoints_observed: []
+    constraint: 未挂载不代表空盘，未经明确授权禁止磁盘写入
+
+directories:
+  source: [local, admin, user]
+  deployment: /srv/apps/<service>/
+  deployment_contents: Compose 等部署声明，已见 tududi、caddy、ddns-go
+  persistent_data: /srv/persistent/data/<service>/
+  secrets: /srv/persistent/secrets/<service>/
+  persistent_location: 1TB 系统盘
+  rules:
+    - 后续服务沿用现有目录分工
+    - 私密配置内容不进入公开仓库
+    - 按实际内容判断保留需求，不能将所有 Docker volume 都视为可丢弃数据
+    - Git 保存 Web 所需知识和脱敏摘要，不同步服务器目录
+
+docker:
+  source: [local, admin]
+  client_version: 29.9.1
+  compose_version: v5.6.0
+  services_running: [docker, containerd]
+  storage_driver: overlayfs
+  snapshotter: io.containerd.snapshotter.v1
+  paths:
+    docker_root: /srv/docker-data/engine/docker
+    containerd_root: /srv/docker-data/engine/containerd
+    containerd_state: /run/containerd
+    docker_config: /etc/docker/daemon.json
+    containerd_config: /etc/containerd/config.toml
+    docker_dropins: /etc/systemd/system/docker.service.d/
+    containerd_dropins: /etc/systemd/system/containerd.service.d/
+    disk_check: /usr/local/sbin/verify-docker-data-disk
+  daemon_proxy:
+    http: http://192.168.1.120:5780
+    https: http://192.168.1.120:5780
+    no_proxy: [localhost, 127.0.0.1, "::1", 192.168.1.0/24]
+    dependency: Windows PC
+    tcp_reachable: true
+    pending: [重新拉取镜像验证]
+
+services:
+  tududi:
+    source: [local, admin]
+    purpose: 任务管理
+    image: chrisvel/tududi:1.9.5
+    state: running
+    health: healthy
+    restart: unless-stopped
+    network: tududi_default
+    compose: /srv/apps/tududi/compose.yaml
+    port: {host_ip: 127.0.0.1, host: 13002, container: 3002, protocol: tcp}
+    entry: {url: "http://192.168.1.110/", via: caddy, observed_http_status: 200}
+    mounts:
+      - {target: /app/db, source: /srv/persistent/data/tududi/db, type: bind, writable: true}
+      - {target: /app/uploads, source: /srv/persistent/data/tududi/uploads, type: bind, writable: true}
+      - {target: /app/backups, type: anonymous_volume, disk: runtime_ssd, writable: true, observed_empty: true}
+    database_directory: 有两份备份类文件及 SQLite WAL、SHM 文件
+    pending: [备份文件一致性, uploads 备份覆盖, 恢复能力]
+
+  caddy:
+    source: [local, admin]
+    purpose: 局域网 HTTP 反向代理
+    image: caddy:2.11.4-alpine
+    state: running
+    health: not-configured
+    restart: unless-stopped
+    network: host
+    compose: /srv/apps/caddy/compose.yaml
+    http_port: 80
+    mounts:
+      - {target: /etc/caddy/Caddyfile, source: /srv/apps/caddy/Caddyfile, type: bind, writable: false}
+      - {target: /data, source: /srv/persistent/data/caddy/data, type: bind, writable: true}
+      - {target: /config, source: /srv/persistent/data/caddy/config, type: bind, writable: true}
+    routes:
+      root: {path: /, upstream: "127.0.0.1:13002"}
+      ddns_admin:
+        path: /ddns-go/*
+        upstream: "127.0.0.1:19876"
+        strip_prefix: /ddns-go
+        location_prefix_rewrite: 已存在
+        allowed_source: 192.168.1.0/24
+        other_sources_status: 403
+        verification: 已检查配置及回环来源被拒绝
+
+  ddns_go:
+    source: [local, admin, user]
+    purpose: 动态 DNS
+    image: ghcr.io/jeessy2/ddns-go:v6.17.7
+    state: running
+    health: not-configured
+    restart: unless-stopped
+    network: ddns-go_default
+    compose: /srv/apps/ddns-go/compose.yaml
+    port: {host_ip: 127.0.0.1, host: 19876, container: 9876, protocol: tcp}
+    mount: {target: /root, source: /srv/persistent/secrets/ddns-go, type: bind, writable: true}
+    private_config: /srv/persistent/secrets/ddns-go/.ddns_go_config.yaml
+    permissions: {directory: "0700", config: "0600"}
+    compose_declares: {interval_seconds: 300, timezone: Asia/Shanghai}
+    anonymous_web_check:
+      redirect: /ddns-go/ → /ddns-go/login
+      login_http_status: 200
+      static_resources: 8 个返回 200
+    pending: [逐项复核运行时参数, 登录后功能, DNS 自动更新]
+    current_work: 用户与现有 Web 会话调试中，本地等待交接后验收
+    historical_dns_plan:
+      source: [history]
+      provider: 阿里云 DNS
+      intent: IPv4 更新已有记录
+      pending: [当前记录名, 记录类型, TTL, 有效 RAM 权限, 实际更新结果]
+
+network:
+  source: [local, admin]
+  interface: enp34s0
+  ipv4: 192.168.1.110/24
+  gateway: 192.168.1.1
+  netplan: {file: /etc/netplan/00-installer-config.yaml, dhcp4: false, dhcp6: true}
+  ipv6: {global_scope_address_observed: true, address: 不公开}
+  ufw:
+    active: true
+    default: {incoming: deny, outgoing: allow, routed: deny}
+    user_rules:
+      - {from: 192.168.1.0/24, protocol: tcp, ports: [22, 80], action: allow}
+  listeners:
+    non_loopback_tcp: [22, 80]
+    loopback_tcp: [13002, 19876, 2019]
+    tcp_443_observed: false
+  pending:
+    - 完整 Docker 转发链审查
+    - 当前路由器端口映射
+    - 公网 HTTP、HTTPS 端到端可达性
+    - IPv6 公网可达性及 IPv6 DDNS
+
+operations:
+  source: [admin, user]
+  personal_crontab: {root: absent, eureka: absent}
+  application_internal_schedulers: 未核验
+  backup_plan: 服务基本稳定后再建设 persistent 备份，尚未建立经恢复验证的方案

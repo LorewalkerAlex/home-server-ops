@@ -5,8 +5,8 @@
 按顺序阅读：
 
 1. [AGENTS.md](AGENTS.md)：协作和执行约定。
-2. [FACTS.md](FACTS.md)：唯一事实表，包含服务器、服务、目录及设计约定。
-3. [PROGRESS.md](PROGRESS.md)：唯一进度表，包含当前工作和后续安排。
+2. [facts.yaml](facts.yaml)：服务器信息，按系统、存储、目录、服务和网络组织。
+3. [progress.yaml](progress.yaml)：项目进度、当前工作和后续安排。
 
 本地 Codex 核验事实并维护仓库，Web 指导具体任务，用户授权和执行服务器变更。
 

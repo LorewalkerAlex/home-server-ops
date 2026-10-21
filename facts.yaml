@@ -5,6 +5,7 @@ sources:
   admin: {by: 用户, received: "2026-10-21—22", method: 管理员命令输出, execution_time: 未提供精确时间}
   user: {by: 用户, date: "2026-10-22", method: 设计意图确认}
   history: {by: Web 历史交接, verification: 未独立复核}
+  ddns_review: {by: 本地 Codex, date: "2026-10-22", checked_at: "2026-10-22T07:53:15+08:00", method: SSH 只读检查部署声明及 HTTP 入口}
 # 各节 source 对应上述来源；pending 为未验证项，intent 为用户设计。
 
 server:
@@ -103,7 +104,7 @@ services:
     pending: [备份文件一致性, uploads 备份覆盖, 恢复能力]
 
   caddy:
-    source: [local, admin]
+    source: [local, admin, ddns_review]
     purpose: 局域网 HTTP 反向代理
     image: caddy:2.11.4-alpine
     state: running
@@ -125,10 +126,10 @@ services:
         location_prefix_rewrite: 已存在
         allowed_source: 192.168.1.0/24
         other_sources_status: 403
-        verification: 已检查配置及回环来源被拒绝
+        verification: 2026-10-22 复核配置及回环来源被拒绝；未因此证明所有公网路径均被拒绝
 
   ddns_go:
-    source: [local, admin, user]
+    source: [local, admin, user, ddns_review]
     purpose: 动态 DNS
     image: ghcr.io/jeessy2/ddns-go:v6.17.7
     state: running
@@ -142,11 +143,17 @@ services:
     permissions: {directory: "0700", config: "0600"}
     compose_declares: {interval_seconds: 300, timezone: Asia/Shanghai}
     anonymous_web_check:
+      source: [ddns_review]
       redirect: /ddns-go/ → /ddns-go/login
       login_http_status: 200
       static_resources: 8 个返回 200
     pending: [逐项复核运行时参数, 登录后功能, DNS 自动更新]
-    current_work: 用户与现有 Web 会话调试中，本地等待交接后验收
+    acceptance:
+      user_report: 2026-10-22 用户报告 DDNS 已完成
+      verified: 部署声明、登录页重定向、静态资源及回环来源拒绝
+      missing_evidence: 实际自动更新日志及 DNS 解析验证、登录后使用结果
+      permission_limit: 本地审查账号不能读取私密配置和 Docker 日志
+      result: 部分通过，自动更新功能待验收
     historical_dns_plan:
       source: [history]
       provider: 阿里云 DNS

@@ -9,7 +9,8 @@
 - 2026-10-21：建立本地仓库和协作约定。
 - Verified：本地监督者已于 2026-10-21 通过专用普通账号完成 SSH 登录验证，服务器运行 Ubuntu 26.04.1 LTS；详见 [001：监督者访问验收](tasks/001-supervisor-access.md)。
 - Verified：已完成 [002：基础基线核查](tasks/002-baseline-review.md)，含本地只读检查及用户返回的管理员结果；当前事实与历史差异见 [服务器当前状态](docs/current-state.md)。
-- Pending verification：[003：Tududi 备份范围与调度核查](tasks/003-tududi-backup-review.md) 已确认备份卷为空、数据库和 uploads 在系统盘；当前等待调度补充证据，自动备份及恢复尚未证实。DDNS 由用户继续调试，公网验证单独保留为未知。
+- Verified：[003：Tududi 存储相关事实核查](tasks/003-tududi-backup-review.md) 已记录空备份卷、系统盘上的 db / uploads，以及 root / eureka 没有个人 crontab。用户确认 1TB 盘保留重建所需内容、500GB 盘用于 Docker 运行时，备份待服务基本稳定后建设。
+- 当前阶段：结合用户目标讨论设计合理性，见 [当前状态与初步审查](docs/current-state.md)。自动备份、恢复能力及公网验证中的未知项继续保留，DDNS 由用户与 Web 调试。
 - 远程仓库：[LorewalkerAlex/home-server-ops](https://github.com/LorewalkerAlex/home-server-ops)，已核验为 Public；本地分支为 `main`。
 
 以上为已发布的最近核验状态；后续核验应记录来源及核验时间，不能将历史记录当作实时状态。
@@ -25,7 +26,7 @@
 
 本地监督者收到结果后，结合已授权的只读检查进行验收，维护项目事实并提交、推送更新。Web 无需承担本地仓库维护职责；新会话通过仓库获取已发布的上下文，无需依赖其他会话的聊天历史。
 
-任务 001 和任务 002 的基础范围已完成，目前推进任务 003 的只读核查，尚未发布 Web 修改任务。DDNS 仍在另行调试，待用户交接后再验收；Web 先读取当前状态，按用户指定的任务执行，不因基线完成而认定 DDNS 或备份恢复已经成功。
+任务 001、002、003 的本轮事实记录已完成，当前没有新的 Web 修改任务。未知项和未建设的功能不自动构成缺陷或待执行任务；先结合用户目标讨论，再形成具体工作。DDNS 待用户交接调试结果后验收，备份建设按用户确认的后续阶段安排推进。
 
 ## 仓库边界
 

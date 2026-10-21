@@ -1,4 +1,5 @@
 # 本地访问资料与敏感信息
+.local/
 .ssh/
 .aws/
 secrets/

@@ -5,6 +5,7 @@ set -eu
 sudo python3 -u - <<'PY'
 import itertools
 import json
+import os
 import re
 import subprocess
 from pathlib import Path
@@ -46,8 +47,18 @@ for mount in container.get('Mounts', []):
 
 print('=== 用户 crontab 摘要（不输出命令或凭据） ===')
 for user in ('root', 'eureka'):
-    result = subprocess.run(['crontab', '-u', user, '-l'], capture_output=True, text=True)
+    result = subprocess.run(['crontab', '-u', user, '-l'], capture_output=True, text=True, env={**os.environ, 'LC_ALL': 'C'})
     entries = [line.strip() for line in result.stdout.splitlines() if line.strip() and not line.lstrip().startswith('#') and not re.match(r'^\s*[A-Za-z_]\w*\s*=', line)]
-    print(json.dumps({'user': user, 'query_exit_code': result.returncode, 'active_entry_count': len(entries), 'backup_keyword_matches': sum(bool(re.search(r'backup|restic|borg|tududi', line, re.I)) for line in entries)}))
+    diagnostic = ' '.join(result.stderr.split())
+    no_crontab = result.returncode == 1 and diagnostic == f'no crontab for {user}'
+    query_valid = result.returncode == 0 or no_crontab
+    print(json.dumps({
+        'user': user,
+        'query_exit_code': result.returncode,
+        'query_status': 'present' if result.returncode == 0 else 'absent' if no_crontab else 'query_failed',
+        'active_entry_count': len(entries) if query_valid else None,
+        'backup_keyword_matches': sum(bool(re.search(r'backup|restic|borg|tududi', line, re.I)) for line in entries) if query_valid else None,
+        'error_diagnostic': diagnostic[:200] if not query_valid else None,
+    }))
 PY
 )

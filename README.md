@@ -9,7 +9,7 @@
 - 2026-10-21：建立本地仓库和协作约定。
 - Verified：本地监督者已于 2026-10-21 通过专用普通账号完成 SSH 登录验证，服务器运行 Ubuntu 26.04.1 LTS；详见 [001：监督者访问验收](tasks/001-supervisor-access.md)。
 - Verified：已完成 [002：基础基线核查](tasks/002-baseline-review.md)，含本地只读检查及用户返回的管理员结果；当前事实与历史差异见 [服务器当前状态](docs/current-state.md)。
-- Pending verification：当前重点为 [003：Tududi 备份范围与调度核查](tasks/003-tududi-backup-review.md)，等待管理员元数据检查。DDNS 由用户继续调试，功能验收、备份恢复和公网验证分别保留为未知。
+- Pending verification：[003：Tududi 备份范围与调度核查](tasks/003-tududi-backup-review.md) 已确认备份卷为空、数据库和 uploads 在系统盘；当前等待调度补充证据，自动备份及恢复尚未证实。DDNS 由用户继续调试，公网验证单独保留为未知。
 - 远程仓库：[LorewalkerAlex/home-server-ops](https://github.com/LorewalkerAlex/home-server-ops)，已核验为 Public；本地分支为 `main`。
 
 以上为已发布的最近核验状态；后续核验应记录来源及核验时间，不能将历史记录当作实时状态。

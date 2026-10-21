@@ -1,6 +1,6 @@
 # 003：Tududi 备份范围与调度核查
 
-状态：只读核查进行中，等待用户管理员元数据检查。发起日期：2026-10-21。当前执行主体为本地监督者及用户，尚未发布 Web 配置修改任务。
+状态：存储与卷内容元数据已核实；备份调度待确认，任务继续进行。发起及本次证据接收日期：2026-10-21。当前执行主体为本地监督者及用户，尚未发布 Web 配置修改任务。
 
 ## 目标与已知前提
 
@@ -10,7 +10,7 @@
 
 - 运行容器为 `chrisvel/tududi:1.9.5`，状态 healthy，重启策略 unless-stopped。
 - `/app/db` 和 `/app/uploads` 为可写 bind，位于约 1TB 系统盘上的 `/srv/persistent/data/tududi/`。
-- `/app/backups` 为 Docker volume，数据位于约 500GB 的 Docker 数据盘，卷路径为长哈希名称。看起来可能是镜像默认生成的匿名卷，但创建来源尚未核实，不能仅凭名称下结论。
+- `/app/backups` 为 Docker volume，数据位于约 500GB 的 Docker 数据盘；用户后续元数据结果确认该卷当前为空。
 - 数据库目录中有两份备份类文件，以及当前数据库和 WAL / SHM；尚未验证两份文件的一致性、完整性或恢复能力。
 - 本地可读的系统 timer 和 `/etc/cron.d` 未见明显 Tududi 备份项；个人 crontab、容器内调度及应用设置仍未知。
 
@@ -22,16 +22,37 @@
 
 ## 用户管理员检查
 
-查看 [003-tududi-backup-readonly.sh](../checks/003-tududi-backup-readonly.sh)，在 Ubuntu 管理员会话中执行其内容；任一步失败即停止并反馈错误。脚本不输出环境变量或 crontab 命令，不读取数据库和备份字节内容。
+用户已返回 [003-tududi-backup-readonly.sh](../checks/003-tududi-backup-readonly.sh) 的结果，无需重跑完整检查。实际镜像声明三个卷目标，Compose 仅管理 db / uploads 两个 bind、无顶层命名卷；backups 卷为 local driver、无 Compose 标签，顶层条目数 0。三项挂载的实际文件系统已确认，与此前推断相符。
 
-核对重点：
+判断：符合镜像默认生成匿名卷的情形；这只是对元数据和 Docker 行为的推断，不是最初创建请求的原始记录。该卷检查时为空，两份数据库目录备份另存于系统盘。没有证据证明 uploads 已备份，也未验证恢复。
 
-1. 实际镜像是否声明 `/app/backups`，Compose 是否显式管理该卷；据此区分镜像自动创建和人为声明，不能只凭长哈希名称认定。
-2. `/app/backups` 是否已有文件，是否确实位于 Docker 数据盘；文件名及修改时间只能作为存在性线索。
-3. 数据库与 uploads 的实际文件系统，明确完整恢复不能只关注 SQLite 主文件。
-4. root 和管理员个人 crontab 是否存在任务、是否有备份相关关键词。该筛选可能漏掉间接脚本、容器内调度或其他调度器，不能作为“没有自动备份”的充分证据。
+原脚本只输出了 crontab 退出码、未保留错误原因，导致查询失败时也显示 active_entry_count=0。现已修正脚本：只在查询成功或识别出明确的 no-crontab 信息时记录任务数，其他失败以 null 表示未知。该修正不改变已经收到的历史证据。
 
-用户返回输出后再决定是否需要额外检查应用备份设置或脚本来源，不擅自执行应用备份接口。
+## 最小补充检查
+
+只需在 Ubuntu 管理员会话补充以下命令，不再枚举卷或读取数据库；stdout 被丢弃，不展示 crontab 中的命令或凭据，只保留 stderr 原因和查询是否成功。
+
+```bash
+for account in root eureka; do
+    printf '\n=== %s crontab ===\n' "$account"
+    if sudo env LC_ALL=C crontab -u "$account" -l >/dev/null; then
+        printf 'query_success; contents not displayed\n'
+    else
+        printf 'query_nonzero; see diagnostic above\n'
+    fi
+done
+```
+
+即使确认两个个人 crontab 不存在，也不能排除应用或容器内调度。后续需基于应用备份设置或实现补齐这一点；不通过触发备份接口来试探。
+
+核对结果与剩余重点：
+
+1. 已确认实际镜像声明 `/app/backups`、Compose 未显式管理该卷；元数据符合默认匿名卷行为，不以名称作为唯一依据。
+2. 已确认 `/app/backups` 位于 Docker 数据盘且检查时为空；不在本轮创建或删除文件。
+3. 已确认数据库与 uploads 的实际文件系统为系统盘；完整恢复不能只关注 SQLite 主文件。
+4. 待确认 root / 管理员个人 crontab 的查询失败原因。即使两者均不存在，仍可能有间接脚本、容器内调度或其他调度器，不能据此断定没有自动备份。
+
+当前剩余缺口是调度来源、uploads 是否覆盖、离机副本与恢复能力。下一项实施任务的准备方向为：确定可接受的数据丢失窗口、备份目标及保留策略，设计 SQLite 一致性备份和 uploads / 必要配置覆盖，再安排隔离恢复验证。目标位置和恢复方式未定前不发布具体部署命令。
 
 ## 验收标准与后续
 

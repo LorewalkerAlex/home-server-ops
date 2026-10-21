@@ -89,11 +89,21 @@
 - 有 `db-backup-20261021134257.sqlite3` 和 `db-premigrate-20260920000002-make-user-email-nullable.sqlite3` 两份备份类文件（644）。先前直接检查发现其父目录受 750 权限限制，不能仅凭文件 644 就认定全体用户可访问。
 - ddns-go 配置目录为 700，配置文件为 600，属主为 eureka；只验证元数据，没有读取凭据或有效 DNS 设置。
 
-Tududi 的 `/app/backups` 挂载到 Docker data-root 内的一个长哈希名称 volume，位于约 500GB 运行时数据盘；数据库目录中的两份备份类文件位于约 1TB 系统盘。该 volume 的内容、创建来源、是否由应用定时备份，以及是否涵盖 uploads 尚未查明；目前只能确认挂载存在，不能确认其中已有备份。未查清前不能将该卷按“可丢弃运行时数据”处理。
+用户进一步返回了任务 003 的镜像、Compose、卷和目录检查结果（2026-10-21 接收，精确执行时间未知）：
+
+| 路径 | Verified：当前存储与内容证据 |
+|---|---|
+| `/app/db` | Compose 显式 bind 到系统盘上的 `/srv/persistent/data/tududi/db`，与实际挂载一致；该目录中有前述两份备份类文件 |
+| `/app/uploads` | Compose 显式 bind 到系统盘上的 `/srv/persistent/data/tududi/uploads`，与实际挂载一致；没有检查其业务内容或证实上传文件已备份 |
+| `/app/backups` | 实际为 local driver volume，位于 `/srv/docker-data` 数据盘；顶层目录枚举为 0 项、未截断，检查时为空 |
+
+镜像声明 `/app/backups`、`/app/db`、`/app/uploads` 为卷目标；当前 Compose 只为 db 和 uploads 提供 bind，未声明 backups 或顶层命名卷。backups 卷无 Compose 标签，创建时间为 `2026-10-21T13:38:28Z`。Inferred：该挂载符合镜像声明触发 Docker 自动创建匿名卷的行为；仅凭该挂载不能证明已配置备份策略。参见 [Dockerfile VOLUME](https://docs.docker.com/reference/dockerfile/#volume) 和 [匿名卷说明](https://docs.docker.com/engine/storage/volumes/#named-and-anonymous-volumes)。未读取最初的容器创建请求，不将创建过程冒充直接观察。
+
+空卷不等于数据库目录中的两份备份不存在，也不能证明应用从未执行过任何备份。当前不能把这个空挂载作为已有备份方案，更不能据此决定删除、迁移或重建卷。
 
 备份存在性已经有证据，但备份一致性、恢复演练、保留策略、离机副本和应用更新回滚仍未验收。数据库目录中存在 WAL；不应将复制单个正在使用的主数据库文件作为已完成的一致性热备份。后续方案需遵循 [SQLite WAL 说明](https://www.sqlite.org/wal.html) 和 [在线备份机制](https://www.sqlite.org/backup.html)，本次未打开数据库或执行备份。
 
-本地只读检查未找到 `/srv/backups`、`/srv/persistent/backups`、`/etc/restic`、`/etc/borg`；`/etc/cron.d` 仅列出占位文件和 e2scrub_all。已见的系统 timer 无明显 Tududi 备份项，但 root / 管理员个人 crontab 和容器内调度尚未读取，不能据此认定没有自动备份。
+本地只读检查未找到 `/srv/backups`、`/srv/persistent/backups`、`/etc/restic`、`/etc/borg`；`/etc/cron.d` 仅列出占位文件和 e2scrub_all。已见的系统 timer 无明显 Tududi 备份项。用户返回的 root / eureka crontab 查询均退出 1，原脚本未保留 stderr，结果中的 0 项不能当作“成功查询后没有任务”；需区分没有 crontab 与其他查询失败。容器内调度和应用备份设置同样未知，自动备份、uploads 覆盖、保留策略与离机副本尚未获证实。
 
 unattended-upgrades 服务为 active/running，APT 配置允许发行版及 security / ESM 安全来源。是否最近升级成功、自动重启行为、应用镜像更新和回滚流程仍未核实，不将系统包自动升级等同于容器自动更新。
 

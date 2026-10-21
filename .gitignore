@@ -1,4 +1,5 @@
 # 本地访问资料与敏感信息
+/AGENTS.md
 .local/
 .ssh/
 .aws/

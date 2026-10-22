@@ -9,6 +9,7 @@ sources:
   ddns_logs: {by: 用户, date: "2026-10-22", method: 提供脱敏运行日志, log_window: "2026-10-22 07:04:04—07:44:05（日志时间）"}
   ddns_confirmation: {by: 用户, date: "2026-10-22", method: 明确确认 DDNS 已成功}
   deployment_review: {by: 本地 Codex, checked_at: "2026-10-22T09:15:12+08:00", method: 只读检查可访问的 Compose、Docker 日志配置及 Caddy 入口声明}
+  public_access_decision: {by: 用户, date: "2026-10-22", method: 确认使用已申请域名及已生效 DDNS，从公网访问本地服务}
 # 各节 source 对应上述来源；pending 为未验证项，intent 为用户设计。
 
 server:
@@ -181,6 +182,13 @@ services:
 
 network:
   source: [local, admin]
+  public_access:
+    source: [public_access_decision]
+    domain_registered: true
+    ddns_active: true
+    intended_route: 公网域名 HTTPS → 家庭网络入口 → Caddy → 本地服务
+    https_status: Planned，尚未记录公网 HTTPS 接入完成
+    first_service_and_hostname: 待确定；真实域名不写入公开上下文
   interface: enp34s0
   ipv4: 192.168.1.110/24
   gateway: 192.168.1.1

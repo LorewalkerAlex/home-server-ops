@@ -10,6 +10,8 @@ sources:
   ddns_confirmation: {by: 用户, date: "2026-10-22", method: 明确确认 DDNS 已成功}
   deployment_review: {by: 本地 Codex, checked_at: "2026-10-22T09:15:12+08:00", method: 只读检查可访问的 Compose、Docker 日志配置及 Caddy 入口声明}
   public_access_decision: {by: 用户, date: "2026-10-22", method: 确认使用已申请域名及已生效 DDNS，从公网访问本地服务}
+  web_https_handoff: {by: 用户转交 Web 任务记录, date: "2026-10-22", method: Caddy 变更、DNS、UFW、路由器及公司外网测试交接, scope: 未提供每条命令的完整原始输出，按用户执行记录标注}
+  https_review: {by: 本地 Codex, checked_at: "2026-10-22T11:48:13+08:00", method: SSH 只读核对 Caddyfile、有效配置、DNS IPv4 一致性及本机 HTTP/TLS}
 # 各节 source 对应上述来源；pending 为未验证项，intent 为用户设计。
 
 server:
@@ -94,7 +96,7 @@ docker:
 
 services:
   tududi:
-    source: [local, admin]
+    source: [local, admin, web_https_handoff, https_review]
     purpose: 任务管理
     image: chrisvel/tududi:1.9.5
     state: running
@@ -103,7 +105,11 @@ services:
     network: tududi_default
     compose: /srv/apps/tududi/compose.yaml
     port: {host_ip: 127.0.0.1, host: 13002, container: 3002, protocol: tcp}
-    entry: {url: "http://192.168.1.110/", via: caddy, observed_http_status: 200}
+    entry:
+      local_upstream: {url: "http://127.0.0.1:13002/", observed_http_status: 200, source: [https_review]}
+      public_target: "https://tududi.<DOMAIN>:18443"
+      public_status: TCP 可达由用户报告，TLS、正式证书及登录功能待验收
+      lan_ip_root: 已从默认转发 Tududi 改为 HTTP 404
     mounts:
       - {target: /app/db, source: /srv/persistent/data/tududi/db, type: bind, writable: true}
       - {target: /app/uploads, source: /srv/persistent/data/tududi/uploads, type: bind, writable: true}
@@ -112,8 +118,8 @@ services:
     pending: [备份文件一致性, uploads 备份覆盖, 恢复能力]
 
   caddy:
-    source: [local, admin, ddns_review, deployment_review]
-    purpose: 局域网 HTTP 反向代理
+    source: [local, admin, ddns_review, deployment_review, web_https_handoff, https_review]
+    purpose: Tududi 域名反代与局域网管理入口，公网 HTTPS 尚未验收
     image: caddy:2.11.4-alpine
     state: running
     health: not-configured
@@ -121,21 +127,43 @@ services:
     network: host
     compose: /srv/apps/caddy/compose.yaml
     http_port: 80
-    caddyfile_site: ":80"
+    https_port: 443
+    caddyfile_sites: ["<TUDUDI_FQDN>", "http://192.168.1.110"]
+    configuration_change:
+      source: [web_https_handoff, https_review]
+      backup: /srv/apps/caddy/Caddyfile.bak-20261022-015403
+      backup_verified: 存在，内容校验值与上次已核验的 Caddyfile 相同
+      validation_and_reload: 用户报告 Valid configuration、load complete；本地核对有效配置包含域名及 80、443 监听声明
     mounts:
       - {target: /etc/caddy/Caddyfile, source: /srv/apps/caddy/Caddyfile, type: bind, writable: false}
       - {target: /data, source: /srv/persistent/data/caddy/data, type: bind, writable: true}
       - {target: /config, source: /srv/persistent/data/caddy/config, type: bind, writable: true}
     routes:
-      root: {path: /, upstream: "127.0.0.1:13002"}
+      tududi_domain:
+        host: "<TUDUDI_FQDN>"
+        upstream: "127.0.0.1:13002"
+        http_observed: "308 → https://<TUDUDI_FQDN>/，未携带外部 18443 端口"
+      lan_ip_root: {host: 192.168.1.110, allowed_source: 192.168.1.0/24, observed_http_status: 404}
       ddns_admin:
+        site: "http://192.168.1.110"
         path: /ddns-go/*
         upstream: "127.0.0.1:19876"
         strip_prefix: /ddns-go
         location_prefix_rewrite: 已存在
         allowed_source: 192.168.1.0/24
         other_sources_status: 403
-        verification: 2026-10-22 复核配置及回环来源被拒绝；未因此证明所有公网路径均被拒绝
+        verification: LAN 请求为 307 跳转登录页；回环来源使用同一 IP Host 请求为 403。公网 HTTPS 路径尚不能实测
+    certificate_status:
+      source: [web_https_handoff, https_review]
+      http_01_and_tls_alpn_01: 用户日志报告连接超时
+      staging_seen_in_logs: true
+      explicit_staging_in_active_config: false
+      explicit_tls_automation_policy_count: 0
+      alidns_config_in_active_config: false
+      local_trusted_tls_handshake: false
+      local_tls_error: TLSV1_ALERT_INTERNAL_ERROR
+      production_certificate: 未有成功签发和信任验证证据
+      dns_01: 尚未执行；专用 RAM、凭据、自定义镜像均未建设
 
   ddns_go:
     source: [local, admin, user, ddns_review, ddns_logs, ddns_confirmation, deployment_review]
@@ -181,32 +209,61 @@ services:
       pending: [当前记录名, 记录类型, TTL, 有效 RAM 权限]
 
 network:
-  source: [local, admin]
+  source: [local, admin, web_https_handoff, https_review]
   public_access:
-    source: [public_access_decision]
+    source: [public_access_decision, web_https_handoff, https_review]
     domain_registered: true
     ddns_active: true
     intended_route: 公网域名 HTTPS → 家庭网络入口 → Caddy → 本地服务
-    https_status: Planned，尚未记录公网 HTTPS 接入完成
-    first_service_and_hostname: 待确定；真实域名不写入公开上下文
+    application: tududi
+    target_url: "https://tududi.<DOMAIN>:18443"
+    https_status: Pending verification，TCP 可达但 TLS、正式证书及应用访问尚未通过
+    dns:
+      cname: {name: "tududi.<DOMAIN>", target: "<DOMAIN>", source: [web_https_handoff]}
+      root_a: 由现有 ddns-go 维护
+      ipv4_answer_sets_equal: {value: true, source: [https_review]}
+      wan_matches_dns: {value: true, source: [web_https_handoff]}
+    router_mappings:
+      source: [web_https_handoff]
+      server: 192.168.1.110
+      tcp:
+        - {external: 80, internal: 80, state: 用户报告已启用}
+        - {external: 443, internal: 443, state: 用户报告已启用}
+        - {external: 18080, internal: 80, state: 诊断映射，未确认删除}
+        - {external: 18443, internal: 443, state: 已选作当前接入端口，未确认删除}
+      cleanup: 接入验收后清理不再使用的 18080；保留承载当前访问的 18443，直到另行切换标准端口
+    external_test:
+      source: [web_https_handoff]
+      location: 公司 Windows 外网，不能据此代表所有外部网络
+      tcp_connect: {"80": false, "443": false, "18080": true, "18443": true}
+      http_18080: "308，Server Caddy，Location 跳至未带端口的 HTTPS 地址"
+      tls_18443: 未完成信任验证
+      standard_ports_failure_cause: 未确定，不将运营商封锁作为已核实事实；旧 tcpdump 零计数无有效证明力
+    future_standard_ports: 若以后标准端口可用，优先调整路由器及必要的跳转配置，保持服务器 443 与 Tududi 13002 不变
   interface: enp34s0
   ipv4: 192.168.1.110/24
   gateway: 192.168.1.1
   netplan: {file: /etc/netplan/00-installer-config.yaml, dhcp4: false, dhcp6: true}
   ipv6: {global_scope_address_observed: true, address: 不公开}
   ufw:
+    rules_source: [web_https_handoff]
     active: true
     default: {incoming: deny, outgoing: allow, routed: deny}
+    default_last_verified: "2026-10-21"
     user_rules:
       - {from: 192.168.1.0/24, protocol: tcp, ports: [22, 80], action: allow}
+      - {from: 0.0.0.0/0, protocol: tcp, ports: [80, 443], action: allow, scope: 用户报告新增 IPv4 规则，IPv6 未复核}
   listeners:
-    non_loopback_tcp: [22, 80]
+    source: [local, web_https_handoff, https_review]
+    non_loopback_tcp: [22, 80, 443]
     loopback_tcp: [13002, 19876, 2019]
-    tcp_443_observed: false
+    caddy_active_listen: [":80", ":443"]
+    tcp_443_observed: 用户报告已监听，本地连接已到达 TLS 服务但握手失败
   pending:
     - 完整 Docker 转发链审查
-    - 当前路由器端口映射
-    - 公网 HTTP、HTTPS 端到端可达性
+    - 正式可信证书及 18443 上的 Tududi 端到端访问
+    - 从公网验证 DDNS 管理入口仍不可用
+    - 验收后确认诊断映射清理及最终公网规则
     - IPv6 公网可达性及 IPv6 DDNS
 
 operations:

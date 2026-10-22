@@ -8,6 +8,7 @@ sources:
   ddns_review: {by: 本地 Codex, date: "2026-10-22", checked_at: "2026-10-22T07:53:15+08:00", method: SSH 只读检查部署声明及 HTTP 入口}
   ddns_logs: {by: 用户, date: "2026-10-22", method: 提供脱敏运行日志, log_window: "2026-10-22 07:04:04—07:44:05（日志时间）"}
   ddns_confirmation: {by: 用户, date: "2026-10-22", method: 明确确认 DDNS 已成功}
+  deployment_review: {by: 本地 Codex, checked_at: "2026-10-22T09:15:12+08:00", method: 只读检查可访问的 Compose、Docker 日志配置及 Caddy 入口声明}
 # 各节 source 对应上述来源；pending 为未验证项，intent 为用户设计。
 
 server:
@@ -63,12 +64,16 @@ directories:
     - Git 保存 Web 所需知识和脱敏摘要，不同步服务器目录
 
 docker:
-  source: [local, admin]
+  source: [local, admin, deployment_review]
   client_version: 29.9.1
   compose_version: v5.6.0
   services_running: [docker, containerd]
   storage_driver: overlayfs
   snapshotter: io.containerd.snapshotter.v1
+  logging_declaration:
+    source: [deployment_review]
+    daemon_default_driver: local
+    scope: 来自 daemon.json 声明；现有容器实际日志驱动和轮转参数未逐项核验
   paths:
     docker_root: /srv/docker-data/engine/docker
     containerd_root: /srv/docker-data/engine/containerd
@@ -106,7 +111,7 @@ services:
     pending: [备份文件一致性, uploads 备份覆盖, 恢复能力]
 
   caddy:
-    source: [local, admin, ddns_review]
+    source: [local, admin, ddns_review, deployment_review]
     purpose: 局域网 HTTP 反向代理
     image: caddy:2.11.4-alpine
     state: running
@@ -115,6 +120,7 @@ services:
     network: host
     compose: /srv/apps/caddy/compose.yaml
     http_port: 80
+    caddyfile_site: ":80"
     mounts:
       - {target: /etc/caddy/Caddyfile, source: /srv/apps/caddy/Caddyfile, type: bind, writable: false}
       - {target: /data, source: /srv/persistent/data/caddy/data, type: bind, writable: true}
@@ -131,7 +137,7 @@ services:
         verification: 2026-10-22 复核配置及回环来源被拒绝；未因此证明所有公网路径均被拒绝
 
   ddns_go:
-    source: [local, admin, user, ddns_review, ddns_logs, ddns_confirmation]
+    source: [local, admin, user, ddns_review, ddns_logs, ddns_confirmation, deployment_review]
     purpose: 动态 DNS
     image: ghcr.io/jeessy2/ddns-go:v6.17.7
     state: running
@@ -143,7 +149,14 @@ services:
     mount: {target: /root, source: /srv/persistent/secrets/ddns-go, type: bind, writable: true}
     private_config: /srv/persistent/secrets/ddns-go/.ddns_go_config.yaml
     permissions: {directory: "0700", config: "0600"}
-    compose_declares: {interval_seconds: 300, timezone: Asia/Shanghai}
+    compose_declares:
+      source: [ddns_review, deployment_review]
+      interval_seconds: 300
+      timezone: Asia/Shanghai
+      read_only_rootfs: true
+      cap_drop: [ALL]
+      no_new_privileges: true
+      logging: {driver: json-file, max_size: 10m, max_file: "3"}
     anonymous_web_check:
       source: [ddns_review]
       redirect: /ddns-go/ → /ddns-go/login

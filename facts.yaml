@@ -1,5 +1,5 @@
-# 已记录的服务器快照，不代表持续监测；这是任务上下文，不是可部署配置。
-updated: "2026-10-22"
+# 已记录的服务器快照，不代表持续监测；conventions 为运行规范，不代表实施结果。均不是可直接部署的配置。
+updated: "2026-10-23"
 sources:
   local: {by: 本地 Codex, date: "2026-10-21", method: SSH 只读核验}
   admin: {by: 用户, received: "2026-10-21—22", method: 管理员命令输出, execution_time: 未提供精确时间}
@@ -14,6 +14,7 @@ sources:
   https_review: {by: 本地 Codex, checked_at: "2026-10-22T11:48:13+08:00", method: SSH 只读核对 Caddyfile、有效配置、DNS IPv4 一致性及本机 HTTP/TLS}
   https_final_handoff: {by: 用户转交 Web 收尾记录并确认完成, date: "2026-10-22", method: 4129 入口、映射及 UFW 清理、自定义镜像、容器重建与内外网访问结果}
   https_final_review: {by: 本地 Codex, checked_at: "2026-10-22T20:54:53+08:00", method: SSH 只读核验可读部署声明、有效路由、LAN HTTP、可信 TLS 与 HTTPS 响应, scope: HTTPS 测试通过 LAN 直连服务器 443，未独立模拟外网路由器入口；未登录应用或读取凭据}
+  network_handoff: {by: 用户转交 Web 05.1 规范及只读检查摘要, received: "2026-10-23", execution_time: 未提供精确时间, scope: 防火墙检查由用户执行；本地仅审阅交接正文，未收到原始命令输出，未对服务器独立复核}
 # 各节 source 对应上述来源；pending 为未验证项，intent 为用户设计。
 
 server:
@@ -261,14 +262,25 @@ network:
   netplan: {file: /etc/netplan/00-installer-config.yaml, dhcp4: false, dhcp6: true}
   ipv6: {global_scope_address_observed: true, address: 不公开}
   ufw:
-    rules_source: [https_final_handoff]
+    rules_source: [https_final_handoff, network_handoff]
     active: true
     default: {incoming: deny, outgoing: allow, routed: deny}
     default_last_verified: "2026-10-21"
+    latest_report: {source: [network_handoff], default_unchanged_reported: true, ipv6_config_enabled: true, ipv6_user_allow_rules_shown: false, scope: 交接摘要报告 IPV6=yes、未显示对应 v6 用户放行规则；不等于 IPv6 无流量或公网安全已验证}
     user_rules:
       - {from: 192.168.1.0/24, protocol: tcp, ports: [22, 80], action: allow}
       - {from: 0.0.0.0/0, protocol: tcp, ports: [443], action: allow, scope: 用户确认保留公网 443、删除公网 80，IPv6 未独立复核}
     removed: 公网 TCP 80 放行规则，用户确认
+  firewall_snapshot_reported:
+    source: [network_handoff]
+    iptables_version: "iptables v1.8.11 (nf_tables)"
+    backend_scope: 此版本字符串表示 iptables 使用 nf_tables API，不能据此判定 Docker 使用原生 nftables 后端；Docker 实际后端未独立核验
+    ipv4_forward_policy: DROP
+    ipv6_input_policy: DROP
+    ipv6_forward_policy: DROP
+    forward_chain_order: 交接报告 IPv4、IPv6 FORWARD 中 DOCKER-USER、DOCKER-FORWARD 先于 UFW 转发链
+    ipv4_nat: 交接报告 127.0.0.1 的 13002、19876 分别转发至 Tududi、DDNS 容器端口
+    scope: 用户执行的只读检查摘要；仅为部分链与 NAT 快照，不构成完整转发安全审查，默认 DROP 不证明所有访问路径安全
   listeners:
     source: [local, https_final_review]
     non_loopback_tcp: [22, 80, 443]
@@ -284,3 +296,62 @@ operations:
   personal_crontab: {root: absent, eureka: absent}
   application_internal_schedulers: 未核验
   backup_plan: 服务基本稳定后再建设 persistent 备份，尚未建立经恢复验证的方案
+
+conventions:
+  network:
+    source: [network_handoff]
+    accepted: "2026-10-23"
+    scope: 05.1 系统与网络运行规范；本地审阅修订后接纳，未修改服务器，不表示所有规范均已逐项验证
+    current_context: 入口、端口及核验来源复用 network 与 services，不将历史快照当作实时状态
+    responsibilities:
+      dns_ddns: 管理域名解析与动态地址更新，不承担端口转发或访问控制
+      router: 管理 IPv4 公网端口到服务器的映射；IPv6 路径另查路由与防火墙
+      ufw: 管理主机防火墙策略；容器发布端口的实际转发行为需结合 Docker 规则核验
+      docker: 管理容器连接、宿主机端口发布及相关规则；host 网络服务按主机监听路径检查
+      caddy: HTTP/HTTPS 入口、TLS、站点路由和反向代理
+      application: 认证、授权与业务处理
+    access:
+      classification: 新增服务先明确仅容器内部、仅本机、局域网或公网的访问需求
+      internal: 无需宿主机或外部访问时，不发布宿主机端口
+      proxied_http: 当前 Caddy 为 host 网络，上游优先发布至 IPv4 回环地址
+      compose_ports_example: "127.0.0.1:<HOST_PORT>:<CONTAINER_PORT>"
+      example_scope: 仅为端口绑定示例，须替换端口并核对服务配置，不可直接部署
+      lan_management: 结合监听地址、Caddy 来源限制和防火墙约束，验证非允许来源被拒绝；不默认公开管理入口
+      public_web: 用户明确需要并授权后经 Caddy 接入，记录用途、访问范围、域名和完整转发链路
+      public_checks: [DNS或DDNS, 路由器外部及内部端口, 监听地址, 对应协议族防火墙, Caddy站点及TLS与上游, 应用认证授权, IPv4与IPv6各自的暴露路径]
+      internal_interfaces: 数据库、缓存及 Docker 管理接口等内部端口不直接公开；没有用途的公网端口保持关闭
+    firewall:
+      - 不仅凭 UFW 默认拒绝或链的默认 DROP 判断容器端口安全；还需检查提前 ACCEPT、NAT、实际转发及访问路径
+      - iptables 的 nf_tables API 与 Docker 原生 nftables 后端是不同概念，规则检查方法须与实际后端相符
+      - 优先通过 Compose 管理端口绑定和网络；不把临时手工规则当作持久部署配置
+      - 不直接清空、重建或覆盖 Docker 管理的规则；必要调整先确认规则归属与持久化入口
+      - IPv6 默认拒绝仍可能存在必要 ICMPv6 等允许规则；IPv4 成功不证明 IPv6 正常或安全
+    change_process:
+      before: 复用已知上下文，按变更范围读取精确现行配置；明确目标、影响、SSH 管理入口和可用回退方式，不引用已删除的备份
+      during: 用户授权后逐项实施必要变更，调整负责该职责的配置；失败先分析，不叠加未经验证的修复
+      after: 按范围验证本机上游、LAN、路由与 TLS、真实外网、其他原有入口及相关 IPv6 路径
+      evidence: 记录测试位置、路径、时间、实际结果与来源；脱敏后交本地 Codex 验收，不将计划中的测试写成完成
+      privacy: 仅提取任务所需字段；命令输出和日志可能含公网地址或凭据，分享前脱敏，不公开完整环境变量或 Caddy 管理 API 配置
+    troubleshooting:
+      method: 沿实际请求路径定位失败环节，结合本机上游对照测试；不要求前层全部通过才检查应用
+      layers:
+        - DNS 解析及 DDNS 目标是否符合预期
+        - 公网 IPv4 映射的外部端口、内部地址及端口；IPv6 路径另查，不套用 IPv4 NAT 结论
+        - 协议族、监听地址、防火墙及允许来源
+        - Docker 当前发布端口、网络与实际转发规则；动态容器 IP 和规则不作为固定参数
+        - Caddy 有效配置、Host 匹配、TLS、上游及必要日志；不可用摘要覆盖完整配置
+        - 应用进程、健康检查、认证及业务日志
+      read_only_commands:
+        ufw: sudo ufw status verbose
+        listeners: sudo ss -lntup
+        containers: "sudo docker ps --format 'table {{.Names}}\t{{.Ports}}\t{{.Status}}'"
+        iptables_ipv4: [sudo iptables -S FORWARD, sudo iptables -t nat -S]
+        iptables_ipv6: [sudo ip6tables -S INPUT, sudo ip6tables -S FORWARD]
+        caddy_logs: sudo docker compose -f /srv/apps/caddy/compose.yaml logs --tail=80
+      command_scope: 按实际后端和故障范围选择最小只读检查；列表非完整审计脚本，原始输出先在本地检查并脱敏，不要求每次全套重跑
+    validation_limits: IPv6 公网路径与完整 Docker 转发审查仍见 network.pending，不因规范交付而关闭
+    references:
+      checked: "2026-10-23"
+      docker_firewall: https://docs.docker.com/engine/network/packet-filtering-firewalls/
+      docker_native_nftables: https://docs.docker.com/engine/network/firewall-nftables/
+      iptables_nft_api: https://manpages.debian.org/trixie/iptables/iptables-nft.8.en.html

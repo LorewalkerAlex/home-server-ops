@@ -5,7 +5,7 @@
 按顺序阅读：
 
 1. [AGENTS.md](AGENTS.md)：协作和执行约定。
-2. [facts.yaml](facts.yaml)：服务器信息，按系统、存储、目录、服务和网络组织。
+2. [facts.yaml](facts.yaml)：服务器信息及网络运行规范（`conventions.network`），区分状态快照与操作约定。
 3. [progress.md](progress.md)：项目进度 checklist、当前工作和后续安排。
 
 本地 Codex 核验事实并维护仓库，Web 指导具体任务，用户授权和执行服务器变更。

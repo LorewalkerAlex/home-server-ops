@@ -6,6 +6,8 @@ sources:
   user: {by: 用户, date: "2026-10-22", method: 设计意图确认}
   history: {by: Web 历史交接, verification: 未独立复核}
   ddns_review: {by: 本地 Codex, date: "2026-10-22", checked_at: "2026-10-22T07:53:15+08:00", method: SSH 只读检查部署声明及 HTTP 入口}
+  ddns_logs: {by: 用户, date: "2026-10-22", method: 提供脱敏运行日志, log_window: "2026-10-22 07:04:04—07:44:05（日志时间）"}
+  ddns_confirmation: {by: 用户, date: "2026-10-22", method: 明确确认 DDNS 已成功}
 # 各节 source 对应上述来源；pending 为未验证项，intent 为用户设计。
 
 server:
@@ -129,7 +131,7 @@ services:
         verification: 2026-10-22 复核配置及回环来源被拒绝；未因此证明所有公网路径均被拒绝
 
   ddns_go:
-    source: [local, admin, user, ddns_review]
+    source: [local, admin, user, ddns_review, ddns_logs, ddns_confirmation]
     purpose: 动态 DNS
     image: ghcr.io/jeessy2/ddns-go:v6.17.7
     state: running
@@ -147,18 +149,22 @@ services:
       redirect: /ddns-go/ → /ddns-go/login
       login_http_status: 200
       static_resources: 8 个返回 200
-    pending: [逐项复核运行时参数, 登录后功能, DNS 自动更新]
+    automatic_checks:
+      source: [ddns_logs]
+      ipv4_detection: 日志显示约每 5 分钟检测一次，地址未变化
+      provider_comparison: "07:19:05 应用报告 IP 与 DNS 服务商记录一致，跳过更新"
+    pending: [逐项复核运行时参数]
     acceptance:
-      user_report: 2026-10-22 用户报告 DDNS 已完成
-      verified: 部署声明、登录页重定向、静态资源及回环来源拒绝
-      missing_evidence: 实际自动更新日志及 DNS 解析验证、登录后使用结果
-      permission_limit: 本地审查账号不能读取私密配置和 Docker 日志
-      result: 部分通过，自动更新功能待验收
+      local_verified: 部署声明、登录页重定向、静态资源及回环来源拒绝
+      user_confirmed: DDNS 已完成，自动更新成功
+      source: [ddns_review, ddns_logs, ddns_confirmation]
+      scope: 更新成功依据用户明确确认；未表述为本地直接观察到 DNS 写入或独立解析验证
+      result: 已完成
     historical_dns_plan:
       source: [history]
       provider: 阿里云 DNS
       intent: IPv4 更新已有记录
-      pending: [当前记录名, 记录类型, TTL, 有效 RAM 权限, 实际更新结果]
+      pending: [当前记录名, 记录类型, TTL, 有效 RAM 权限]
 
 network:
   source: [local, admin]

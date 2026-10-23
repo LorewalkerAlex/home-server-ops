@@ -18,7 +18,65 @@ sources:
   deployment_handoff: {by: 用户转交 Web 05.2 设计初稿及检查摘要, received: "2026-10-23", execution_time: 未提供精确时间, scope: 按用户交接记录配置检查及清理结果，本地未独立复核服务器}
   deployment_standard_review: {by: 本地 Codex, date: "2026-10-23", method: 根据用户授权及现有事实修订 05.2 初稿，形成部署规范与 README 模板, scope: 文档验收；不代表现有服务均已符合规范或服务器 README 已改写}
   hdd_handoff: {by: 用户转交 Web 05.3 只读调查及背景确认, date: "2026-10-23", execution_time: 未提供各项检查精确时间, scope: 据用户实际执行结果的交接摘要记录；本地 Codex 未独立检查硬盘、原始输出或元数据}
+  cloud_export_handoff: {by: 用户转交 Web 数据保全交接, date: "2026-10-23", scope: 云端导出、目录比较及工作区快照按用户执行记录；未独立查询云端}
+  cloud_export_local_review: {by: 本地 Codex, date: "2026-10-23", method: 只读计算现有 Windows 归档和清单文件的 SHA-256，扫描 tar 头并检查 Git 元数据路径, scope: 未执行数据库恢复、读取凭据内容或完整验证 Git 对象历史}
+  cloud_export_acceptance: {by: 用户与本地 Codex 确认验收范围, date: "2026-10-23", decision: 接受私人电脑上的初始归档，取消 01-B 强制加密要求；01-A、01-B 完成，独立恢复与最终同步不冒充已完成}
 # 各节 source 对应上述来源；pending 为未验证项，intent 为用户设计。
+
+cloud_migration:
+  source: [cloud_export_handoff, cloud_export_local_review, cloud_export_acceptance]
+  stage: 初始数据、代码及配置保全完成，未完成正式迁移
+  initial_archive:
+    cloud_stage: /home/admin/cloud-export-20261023
+    cloud_file: /home/admin/cloud-data-export-20261023.tar.gz
+    windows_file: 'E:\downloads\cloud-data-export-20261023.tar.gz'
+    extracted_directory: 'F:\OtherProjects\cloud-data-export-20261023'
+    bytes: 81949659
+    sha256: e53d38592b94739217d027bd57fb16668fe839a5e0fb23d1a41ed1a86117f0b9
+    local_verified: 归档哈希与交接云端值一致；659 个项目文件和 25 个数据文件全部匹配清单，无缺失；tar 头扫描通过
+    privacy: 普通未加密 tar.gz，含私密配置及家庭财务资料，只保存在用户控制的私人存储，不上传公开 Git 或共享位置
+    manifests: [manifest/projects-sha256sums.txt, manifest/data-sha256sums.txt, manifest/source-state.txt]
+  data:
+    redis:
+      container: redis_jav
+      container_port: 6380
+      source_directory: /home/admin/workspace/jav/jav-redis/data
+      cloud_snapshot: /home/admin/workspace/jav/jav-redis/data/redis-export-20261023-final.rdb
+      archive_path: data/redis/redis.rdb
+      bytes: 17242624
+      sha256: f8aaf20b9e923771830c619bb1062b6278dd58fd746f6f89042aafed1aa89f64
+      user_reported: redis-cli --rdb 导出、redis-check-rdb 通过，643666 个键；旧快照保留
+      local_verified: 文件大小及 SHA-256 与交接一致
+    mongodb:
+      container: mongodb-jav
+      container_port: 27017
+      database: javcrawl
+      collection: movie
+      archive_path: data/mongodb/javcrawl.archive.gz
+      bytes: 74114612
+      sha256: 423fabe60ddd17c88a420257db8f96f4aab42b20a66c3a7fd2b0034a2c37427b
+      user_reported: mongodump 原生 archive/gzip 导出，报告 317858 个文档
+      local_verified: 文件大小及 SHA-256 与交接一致
+    family_spending:
+      source_directory: /home/admin/workspace/family-spending-insights/data
+      archive_path: data/family-spending
+      scope: 完整 data 目录，包括 Mapping、身份关联、决策、财务证据及必要状态；不只保留 Mapping
+      user_reported: 源与暂存目录约 12MB，diff -qr 无差异
+      local_verified: 归入 25 个数据文件的清单校验，全部通过；未独立比较云端源目录
+  projects:
+    included: [Proxypool, family-spending-insights, jav-crawl, jav-redis, jav-mongo]
+    scope: 用户交接保留 Git 历史、修改及未跟踪文件，已确认的运行数据与日志按范围排除，业务数据另行导出
+    local_verified: 五个项目均有 .git 路径，659 个项目文件哈希通过；三个 jav 项目位于 projects/jav 下
+    excluded_by_user: [eurexis-gateway, jav-feishu, exr_proj, jf-exr-container, eurexis-portal-poc, family-spending-poc]
+    exclusion_rule: 未经用户重新指定，不对排除项目迁移或额外盘点
+  repeat_export:
+    workflow: 检查空间 → 新版本 Redis/MongoDB 导出 → 完整复制 Family Spending 并比较 → 按需刷新项目快照 → 更新清单 → 打包并检查结构 → Workbench 下载 → 本地比对归档和清单
+    redis: 使用新文件名并先检查目标不存在，原生导出后检查 RDB 结构，保留旧快照
+    mongodb: 使用新的 .partial 输出，成功且非空后转为正式文件；mongodump 使用临时 0600 配置中的 uri/password、archive/gzip 和 numParallelCollections=1，结束删除临时配置，不输出密码
+    resources: 用户报告重查询后曾发生云服务器强制重启；未确定原因，避免无必要的全库统计和遍历，沿用低资源导出方式
+    retention: 本地副本校验通过前不删除原始数据、旧归档或暂存目录，云端删除或停服仍需用户授权
+  limitations: Redis、MongoDB 尚未独立恢复验证；文件级校验不代表已恢复或完成生产切换，文件名中的 final 仍为本次初始副本
+  pending: 最终同步、必要恢复验证及正式切换由 01-D 执行；代理池实际 Redis 依赖在 01-C 按部署需要核对，不据此将其与 redis_jav 视为同源
 
 server:
   source: [local]

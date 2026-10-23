@@ -15,6 +15,8 @@ sources:
   https_final_handoff: {by: 用户转交 Web 收尾记录并确认完成, date: "2026-10-22", method: 4129 入口、映射及 UFW 清理、自定义镜像、容器重建与内外网访问结果}
   https_final_review: {by: 本地 Codex, checked_at: "2026-10-22T20:54:53+08:00", method: SSH 只读核验可读部署声明、有效路由、LAN HTTP、可信 TLS 与 HTTPS 响应, scope: HTTPS 测试通过 LAN 直连服务器 443，未独立模拟外网路由器入口；未登录应用或读取凭据}
   network_handoff: {by: 用户转交 Web 05.1 规范及只读检查摘要, received: "2026-10-23", execution_time: 未提供精确时间, scope: 防火墙检查由用户执行；本地仅审阅交接正文，未收到原始命令输出，未对服务器独立复核}
+  deployment_handoff: {by: 用户转交 Web 05.2 设计初稿及检查摘要, received: "2026-10-23", execution_time: 未提供精确时间, scope: 按用户交接记录配置检查及清理结果，本地未独立复核服务器}
+  deployment_standard_review: {by: 本地 Codex, date: "2026-10-23", method: 根据用户授权及现有事实修订 05.2 初稿，形成部署规范与 README 模板, scope: 文档验收；不代表现有服务均已符合规范或服务器 README 已改写}
 # 各节 source 对应上述来源；pending 为未验证项，intent 为用户设计。
 
 server:
@@ -138,6 +140,8 @@ services:
       base_images: ["caddy:2.11.4-builder-alpine", "caddy:2.11.4-alpine"]
       plugin: github.com/caddy-dns/alidns@c8c945ded9ace193e86f063842ba59981b35146b
       scope: 本地读取构建文件，未执行构建或读取运行镜像元数据
+      compose_build_reported: {source: [deployment_handoff], build_declared: false, scope: 交接报告当前 Compose 仅声明 image，镜像另行构建；不当作本地新检查}
+      image_identity_reported: {source: [deployment_handoff], result: 交接报告容器使用的镜像 ID 与本地自定义标签一致, scope: 未提供具体 ID，本地未独立查询}
     dns_credentials:
       env_file: /srv/persistent/secrets/caddy/alidns.env
       caddyfile_uses_env_references: true
@@ -149,6 +153,10 @@ services:
       file_consistency: 用户交接宿主机与容器 Caddyfile 校验值相同；本地复核有效跳转、路由和 TLS 配置与当前目标一致
       bak_cleanup: 用户确认已删除本轮 4 个历史 .bak，未留额外服务器备份；本地目录检查未发现 .bak 文件
       rollback_note: 旧 .bak 已删除，不再将原备份路径作为可用回退文件
+      extra_cleanup_reported:
+        source: [deployment_handoff]
+        removed: [Caddyfile.before-ddns-go, Caddyfile.before-ddns-go-location-fix, Caddyfile.candidate]
+        scope: 用户交接确认已授权删除并检查不存在；区别于此前 4 个 .bak，本地未重新检查目录
     mounts:
       - {target: /etc/caddy/Caddyfile, source: /srv/apps/caddy/Caddyfile, type: bind, writable: false}
       - {target: /data, source: /srv/persistent/data/caddy/data, type: bind, writable: true}
@@ -355,3 +363,96 @@ conventions:
       docker_firewall: https://docs.docker.com/engine/network/packet-filtering-firewalls/
       docker_native_nftables: https://docs.docker.com/engine/network/firewall-nftables/
       iptables_nft_api: https://manpages.debian.org/trixie/iptables/iptables-nft.8.en.html
+
+  deployment:
+    source: [deployment_standard_review]
+    accepted: "2026-10-23"
+    scope: 05.2 新服务部署规范与 README 模板；适用于后续部署和变更，不据此批量改造现有服务
+    directories: 复用 directories 中 apps、persistent/data、persistent/secrets 和运行时盘的分工，不新增目录体系
+    network: 复用 conventions.network，不另定端口开放规则
+    minimum_requirements:
+      compose: 每个服务在部署目录维护 compose.yaml，记录 Compose 服务名及必要依赖；自定义镜像同时保留 Dockerfile 和构建方法
+      images: 使用明确版本标签，记录实际镜像 ID 或可获取的 digest；自定义构建固定基础镜像版本和插件版本或提交，不仅记录本地标签
+      data: 逐项列出宿主机路径或卷、容器目标、读写模式及保留需求；重要数据显式声明持久挂载，同时检查镜像 VOLUME 引入的匿名卷，不能按所在磁盘推断可删除
+      permissions: 创建挂载目录前明确应用 UID/GID 和必需写权限；不以全局可写权限解决访问错误，迁移现有数据前核对归属和保留要求
+      secrets: 放入已约定的 secrets 目录，通过应用支持的文件挂载或 env_file 等方式注入；公开文档只记录路径、变量名及加载方式，不记录值
+      secret_permissions: 默认目录 0700、文件 0600，由实际读取账号持有；确需组访问时使用专用组及最小权限并记录原因，核对容器 UID/GID 能否读取
+      privilege: 默认不使用 privileged、不挂载 Docker socket、不增加无关 capabilities；评估非 root、只读根文件系统和 no-new-privileges 的兼容性，采用或例外均注明，不把它们当作现有服务事实
+      restart: 长期运行服务默认 unless-stopped；一次性任务等按用途另定并注明，不直接套用常驻策略
+      health: 有可靠业务探针时设置健康检查；否则记录替代的 HTTP、API 或功能验证，running 状态不等于业务健康
+      logs: 容器日志须有有限轮转；以下为新服务默认片段，已有等效设置可保留。应用自行写入的文件日志另设保留策略，Docker 日志轮转不覆盖这些文件
+    compose_service_defaults:
+      restart: unless-stopped
+      logging:
+        driver: local
+        options: {max-size: "10m", max-file: "3"}
+    defaults_scope: 上述只是常驻服务的 Compose 服务级片段，不能替换完整配置；核对实际容器日志设置，daemon 默认变更不会自动改写已有容器
+    configuration:
+      authority: README 标明权威文件、加载方式及验证方法，正式部署只引用明确的配置来源
+      declaration_check: 用 docker compose -f <COMPOSE_FILE> config -q 验证声明；通过仅说明解析及一致性检查通过，不证明应用配置或业务正常
+      deployed_check: 按变更范围提取实际镜像、网络、端口和挂载等必要字段；检查单文件 bind 时可比对两端哈希，避免输出完整 inspect 或环境变量
+      effective_check: 服务支持时检查已加载配置的必要字段，并验证实际响应；不支持运行配置查询时注明限制，使用业务行为验证，不强行要求统一接口
+      sensitive_output: 普通 compose config 会展开变量，Caddy 管理 API 和日志也可能包含秘密；仅保留必要的脱敏结果
+    apply_changes:
+      approval: 服务器变更仍由用户授权；执行前确认现行配置、影响及可用回退资料，失败先分析
+      restart: compose restart 只重启现有容器，不用于应用 Compose 或环境变量变更
+      reload: 应用配置变化时先用对应服务校验，再使用其支持的重载方式；核对容器确实读到新文件
+      recreate: Compose 配置或注入的环境变量变化后，用 compose up -d <SERVICE> 应用并核对实际状态；仅在确认需要时使用 --force-recreate，不把重建当作所有故障的通用修复
+      published_image: 按选定版本拉取普通镜像，再应用配置并验证实际运行镜像与业务；不默认自动升级
+      custom_image: 按 Dockerfile、基础镜像及插件版本构建并记录镜像身份后再更新容器；只有 Compose 声明 build 时才依赖 Compose 构建，不能把 pull 当作自定义构建
+      caddy_case: 复用 services.caddy 的构建与单文件挂载记录；容器内验证和 reload 前核对所读文件，文件一致不代替有效路由与 TLS 验证
+    acceptance:
+      - 按范围核对声明、实际镜像及挂载、已加载配置或替代验证，并记录主体、时间与结果
+      - 验证健康或业务响应及所需访问路径；涉及公网或管理限制时复用网络规范的验证要求
+      - 文档与实际结果一致，未解释差异和未验证项明确；不因某层检查通过就断言整体成功
+    rollback_and_cleanup:
+      rollback: 分别记录配置回退、镜像回退与业务数据恢复；涉及数据库迁移先核对降级兼容性，不能保证仅换回旧镜像即可恢复
+      retention: 变更前保留必需的已知可用配置及镜像信息，记录恢复方法；数据恢复按一致性要求单独处理，不以普通配置副本代替
+      cleanup: 任务结束时检查候选文件、备份和临时产物的内容、引用及恢复价值；仅在授权范围清理已确认无用文件，不因文件名或目录位置批量删除
+      backup_boundary: README 分别记录备份生成、完整性检查和实际恢复验证状态；未建立时如实写明，05.3 负责后续备份与恢复建设
+    documentation:
+      server_readme: 后续新增服务或相关变更时，在 /srv/apps/<service>/README.md 使用下方模板；本轮未创建或修改服务器文件
+      public_repository: 仍只维护 README.md、AGENTS.md、facts.yaml、progress.md；事实和规范放 facts，任务放 progress，不复制完整服务 README 或运行配置
+      maintenance: 配置、镜像、访问入口或数据位置变化后更新相关文档；省略不适用部分，未核实项标明来源与限制，不为填写模板新增功能
+    readme_template: |
+      # <服务名称>
+
+      ## 用途与状态
+      用途：<说明>；当前状态：<结果>；最后核验：<时间、主体和证据>。
+      已知限制：<未核验、不适用或存在的问题>。
+
+      ## 部署与配置
+      部署目录与 Compose：<路径>；Compose 服务名／容器名：<名称>。
+      镜像：<版本及 ID/digest>；自定义构建：<Dockerfile、基础镜像、插件版本及构建方法，不适用则省略>。
+      权威配置与加载方式：<文件、挂载目标或环境注入>；运行 UID/GID 与权限：<核验结果>。
+      重启策略、健康检查或替代验证、日志轮转：<实际配置及例外>。
+
+      ## 访问入口
+      访问范围：<内部／本机／LAN／公网>；实际入口：<仅填适用地址>。
+      链路：<外部端口、服务器监听、Caddy 上游、容器端口>；来源限制与认证：<实际设置>。
+
+      ## 数据与密钥位置
+      持久挂载：<逐项列宿主机路径或卷 → 容器目标、读写模式、用途及保留要求>。
+      私密配置：<只记位置、加载方式、所有者及权限，不写凭据值>。
+      备份与恢复：<分别写备份生成、完整性检查、恢复验证的状态和必要说明；未建设时明确写明>。
+
+      ## 常用操作
+      - 状态：`sudo docker compose -f <COMPOSE_FILE> ps`
+      - 日志：`sudo docker compose -f <COMPOSE_FILE> logs --tail=80 <SERVICE>`
+      - 声明校验：`sudo docker compose -f <COMPOSE_FILE> config -q`
+      - 配置生效：<服务校验和重载方法，或需要重建容器的条件及具体命令>。
+      - 单纯重启：<命令及适用条件>；业务验收：<预期响应和所需访问路径>。
+
+      ## 升级与回退
+      镜像更新或构建：<适用命令、版本选择、必要数据准备及兼容性要求>。
+      配置回退：<真实可用版本和操作>；镜像回退：<可用镜像及适用限制>。
+      数据恢复：<步骤或已有说明的位置、验证结果和限制；未验证则注明>。
+      维护说明：<仅记录影响后续维护的变更，不依赖已删除文件回退>。
+    template_scope: 将占位符替换为实际参数后再使用，命令须匹配现行部署；分享内容须符合公开仓库脱敏规则
+    references:
+      checked: "2026-10-23"
+      compose_config: https://docs.docker.com/reference/cli/docker/compose/config/
+      compose_restart: https://docs.docker.com/reference/cli/docker/compose/restart/
+      compose_up: https://docs.docker.com/reference/cli/docker/compose/up/
+      local_logging: https://docs.docker.com/engine/logging/drivers/local/
+      caddy_reload_validate: https://caddyserver.com/docs/command-line

@@ -17,6 +17,7 @@ sources:
   network_handoff: {by: 用户转交 Web 05.1 规范及只读检查摘要, received: "2026-10-23", execution_time: 未提供精确时间, scope: 防火墙检查由用户执行；本地仅审阅交接正文，未收到原始命令输出，未对服务器独立复核}
   deployment_handoff: {by: 用户转交 Web 05.2 设计初稿及检查摘要, received: "2026-10-23", execution_time: 未提供精确时间, scope: 按用户交接记录配置检查及清理结果，本地未独立复核服务器}
   deployment_standard_review: {by: 本地 Codex, date: "2026-10-23", method: 根据用户授权及现有事实修订 05.2 初稿，形成部署规范与 README 模板, scope: 文档验收；不代表现有服务均已符合规范或服务器 README 已改写}
+  hdd_handoff: {by: 用户转交 Web 05.3 只读调查及背景确认, date: "2026-10-23", execution_time: 未提供各项检查精确时间, scope: 据用户实际执行结果的交接摘要记录；本地 Codex 未独立检查硬盘、原始输出或元数据}
 # 各节 source 对应上述来源；pending 为未验证项，intent 为用户设计。
 
 server:
@@ -52,11 +53,52 @@ storage:
       startup: Docker 和 containerd 依赖挂载，并校验 UUID
       pending: [缺盘故障测试]
   hdd:
+    source: [local, hdd_handoff]
     device: /dev/sda
     capacity: 约 3TB
     partitions_observed: 2
     mountpoints_observed: []
-    constraint: 未挂载不代表空盘，未经明确授权禁止磁盘写入
+    user_confirmed_history:
+      source: [hdd_handoff]
+      previous_use: 同一台服务器原 Windows 系统的 F 盘，保存影片；用户确认重装系统前可正常打开并查看影片
+      goal: 免费、优先开源地恢复访问，保护原始数据优先
+    readonly_investigation_reported:
+      source: [hdd_handoff]
+      model: TOSHIBA HDWD130
+      capacity: 约 3TB（2.73 TiB）
+      partitions:
+        - {device: /dev/sda1, size: 128 MiB, type: Microsoft Reserved}
+        - {device: /dev/sda2, size: 约 2.7 TiB, type: Microsoft Storage Spaces}
+      filesystem_identification: 两个分区均未显示可识别的文件系统、UUID、卷标或挂载点；不代表分区为空或没有文件数据
+      signatures: wipefs --no-act 在整盘仅报告 GPT 和 PMBR，未发现普通文件系统签名
+      partition_table: sgdisk -v /dev/sda 未报告 GPT 分区表问题；不证明虚拟磁盘、文件系统或影片完整
+      storage_spaces_metadata:
+        partition: /dev/sda2
+        header_signature: "SPACEDB "
+        header_layout_version_reported: 2
+        database_offset_within_partition: "0x1000"
+        database_signature: SDBC
+        pool_identity_relation: 交接报告数据库所属 GUID 与磁盘头存储池 GUID 一致；不公开 GUID 值
+        candidate_records:
+          pool: 1
+          physical_disk: 1
+          virtual_disks:
+            - {record_id: 15, type: 3, record_version: 13, fragments: 2}
+            - {record_id: 5998, type: 3, record_version: 13, fragments: 2}
+        candidate_scope: 上述为候选记录，尚未完整解析和验证，不能据此确定虚拟磁盘布局、卷数量或可读性
+        string_observation: 一条候选虚拟磁盘记录原始数据含 UTF-16LE 字符串 Storage，不能认定为已确认卷名
+        layout_count: 未确认；此前扫描边界有误，旧统计值不作为事实采用
+      health:
+        kernel_log: 当前启动周期日志中，未发现本次筛选所匹配的明显 I/O 错误；只覆盖该次日志和筛选范围
+        smartctl_available_reported: false
+        smart_status: 尚未获取，不将日志筛选未见错误等同于健康验证通过
+      operations_reported: 本轮未修改服务器配置、挂载硬盘、安装恢复工具、修复文件系统或写入原盘
+    working_hypothesis:
+      status: Inferred
+      source: [hdd_handoff]
+      assessment: 优先调查 Ubuntu 对原 Storage Spaces 元数据及虚拟磁盘映射的识别兼容性，再判断影片可读性；当前没有证据证明影片已丢失，也未证明数据完整
+    pending: [SMART 健康信息, 原盘镜像及备用空间可行性, 旧版元数据解析与虚拟磁盘映射验证, 文件系统与影片目录可读性, 复制及完整性验证]
+    constraint: 未挂载不代表空盘；未经明确证据与授权，不格式化、不重新分区、不修复文件系统、不向原盘写入；不公开序列号、WWN、完整 GUID 或原始元数据转储
 
 directories:
   source: [local, admin, user]

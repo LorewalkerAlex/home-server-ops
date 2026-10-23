@@ -1,5 +1,5 @@
 # 已记录的服务器快照，不代表持续监测；conventions 为运行规范，不代表实施结果。均不是可直接部署的配置。
-updated: "2026-10-23"
+updated: "2026-10-24"
 sources:
   local: {by: 本地 Codex, date: "2026-10-21", method: SSH 只读核验}
   admin: {by: 用户, received: "2026-10-21—22", method: 管理员命令输出, execution_time: 未提供精确时间}
@@ -18,6 +18,7 @@ sources:
   deployment_handoff: {by: 用户转交 Web 05.2 设计初稿及检查摘要, received: "2026-10-23", execution_time: 未提供精确时间, scope: 按用户交接记录配置检查及清理结果，本地未独立复核服务器}
   deployment_standard_review: {by: 本地 Codex, date: "2026-10-23", method: 根据用户授权及现有事实修订 05.2 初稿，形成部署规范与 README 模板, scope: 文档验收；不代表现有服务均已符合规范或服务器 README 已改写}
   hdd_handoff: {by: 用户转交 Web 05.3 只读调查及背景确认, date: "2026-10-23", execution_time: 未提供各项检查精确时间, scope: 据用户实际执行结果的交接摘要记录；本地 Codex 未独立检查硬盘、原始输出或元数据}
+  hdd_recovery_handoff: {by: 用户转交 Web 05.3 恢复成功及后续计划, record_date: "2026-10-23", received: "2026-10-24", scope: 用户确认只读映射及 NTFS 访问结果；本地未独立检查设备、脚本或文件，不当作持续监测}
   cloud_export_handoff: {by: 用户转交 Web 数据保全交接, date: "2026-10-23", scope: 云端导出、目录比较及工作区快照按用户执行记录；未独立查询云端}
   cloud_export_local_review: {by: 本地 Codex, date: "2026-10-23", method: 只读计算现有 Windows 归档和清单文件的 SHA-256，扫描 tar 头并检查 Git 元数据路径, scope: 未执行数据库恢复、读取凭据内容或完整验证 Git 对象历史}
   cloud_export_acceptance: {by: 用户与本地 Codex 确认验收范围, date: "2026-10-23", decision: 接受私人电脑上的初始归档，取消 01-B 强制加密要求；01-A、01-B 完成，独立恢复与最终同步不冒充已完成}
@@ -111,17 +112,19 @@ storage:
       startup: Docker 和 containerd 依赖挂载，并校验 UUID
       pending: [缺盘故障测试]
   hdd:
-    source: [local, hdd_handoff]
+    source: [local, hdd_handoff, hdd_recovery_handoff]
     device: /dev/sda
     capacity: 约 3TB
     partitions_observed: 2
     mountpoints_observed: []
+    mountpoints_scope: 早期物理盘及成员分区检查未显示挂载点；后续虚拟 NTFS 挂载见 recovery_reported，不用此旧值否定恢复结果
     user_confirmed_history:
       source: [hdd_handoff]
       previous_use: 同一台服务器原 Windows 系统的 F 盘，保存影片；用户确认重装系统前可正常打开并查看影片
       goal: 免费、优先开源地恢复访问，保护原始数据优先
     readonly_investigation_reported:
       source: [hdd_handoff]
+      scope: 历史初查快照；候选记录与旧统计不等同于最终虚拟磁盘结果，后续进展见 recovery_reported
       model: TOSHIBA HDWD130
       capacity: 约 3TB（2.73 TiB）
       partitions:
@@ -151,11 +154,37 @@ storage:
         smartctl_available_reported: false
         smart_status: 尚未获取，不将日志筛选未见错误等同于健康验证通过
       operations_reported: 本轮未修改服务器配置、挂载硬盘、安装恢复工具、修复文件系统或写入原盘
-    working_hypothesis:
-      status: Inferred
-      source: [hdd_handoff]
-      assessment: 优先调查 Ubuntu 对原 Storage Spaces 元数据及虚拟磁盘映射的识别兼容性，再判断影片可读性；当前没有证据证明影片已丢失，也未证明数据完整
-    pending: [SMART 健康信息, 原盘镜像及备用空间可行性, 旧版元数据解析与虚拟磁盘映射验证, 文件系统与影片目录可读性, 复制及完整性验证]
+    recovery_reported:
+      source: [hdd_recovery_handoff]
+      result: Storage Spaces 用户虚拟磁盘映射、GPT 验证、NTFS 只读挂载和原目录访问成功，尚未迁移数据
+      metadata:
+        parsed_signatures: [SPACEDB, SDBC, SDBB]
+        identity_checks: 交接报告存储池及物理磁盘 GUID 校验通过，不记录 GUID 值
+        virtual_disk: {name: Storage, id: 7, provisioning: thin, allocation_unit_mib: 256, total_units: 11142, mapped_units: 9602, unallocated_units: 1540, bytes: 2990907850752}
+        mapping_segments: 2221
+        bounds_check: 物理数据块映射通过容量边界检查
+        scope: 新交接的解析结果，区别于历史候选记录 ID 及有扫描边界问题的旧统计；不推定候选记录 ID 就是虚拟磁盘 ID
+      device_chain:
+        member_partition: /dev/sda2
+        generated_table: /run/storage-space-7.table
+        device_mapper: {path: /dev/mapper/storage-space-7, read_only: true}
+        loop: {observed_path: /dev/loop6, read_only: true, logical_sector_bytes: 4096, offset_bytes: 135266304, size_limit_bytes: 2990772563968}
+        mount: {path: /mnt/storage-space-7-poc, filesystem: ntfs3, options_reported: [ro], label: Storage}
+        device_names_scope: 交接时设备名和参数快照，loop 编号及物理盘设备名不能作为重启后的固定身份
+      validation:
+        virtual_gpt: 按 4096 字节扇区解析；主备 GPT 头及分区表 CRC 均通过，分区表一致
+        ntfs: 主引导扇区、按 GPT 分区末尾定位的备份引导扇区及 MFT/MFTMirr 起始签名通过；blkid 识别 NTFS
+        access: 原根目录及影片目录可访问，已列出影片文件名和大小；一份约 29.3GB 文件被 file 识别为 MP4
+        limits: 未完成全部影片的解码、播放或复制校验，不能据目录访问及文件类型识别认定全部数据完整
+      reboot_persistence:
+        automatic_restore_configured: false
+        table_storage: /run 临时文件系统，重启后表文件不保留
+        effects: Device Mapper、loop 和挂载不会按当前方案自动恢复；临时状态消失不等于原 HDD 数据丢失
+        parser_status: 成功的完整 Python 解析器仅在 Web 对话以内联命令执行，未随本次交接提供，尚未保存为经本地审查的版本控制脚本
+        restoration_scope: 只有部分已用命令及参数，不构成可脱离对话独立执行的完整恢复方案
+        constraint: 保存完整解析逻辑、必要校验及恢复步骤前，不主动重启服务器；不据摘要重写或猜测映射算法
+      original_disk_writes: 用户确认未格式化、重新分区、修复文件系统或对原盘主动写入；映射和挂载均为只读
+    pending: [完整解析程序与映射恢复步骤固化, SMART 健康信息, 原盘镜像及迁移目标空间可行性, 私人文件清单, 单文件传输及播放验证, 所需数据迁移及完整性验证, 数据保全后 HDD 长期布局与备份恢复规划]
     constraint: 未挂载不代表空盘；未经明确证据与授权，不格式化、不重新分区、不修复文件系统、不向原盘写入；不公开序列号、WWN、完整 GUID 或原始元数据转储
 
 directories:

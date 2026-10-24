@@ -59,41 +59,46 @@
 
 - [ ] **02. Family Spending 产品方案与数据迁移**
 
-  目标：决定继续维护现有系统，还是基于成熟开源项目适配，并明确 Mapping 数据的保存与使用方式。
+  目标：基于已确认的 Cashew Selfhosted 方案，明确并验证历史数据初始化迁移、日常自动化 Mapping 和 PC 审核流程，保全原始证据及用户业务决定。
 
-  范围：调研消费管理、账单解析及交易管理项目；比较功能、数据模型、分类与 Mapping 能力、扩展方式、部署成本；评估继续自研、Fork 或适配现有产品，并确定数据迁移路径。
+  阶段状态（2026-10-24 用户方案确认及本地静态复核）：目标架构已确定，仍处于实施前设计；任务未完成，尚未部署 Cashew、执行数据迁移或端到端验证。本次只更新本任务，不修改业务代码或服务。以下方案取代 2026-10-23 的独立标准化数据库、持久化规则/人工决定/ID 对应关系及预先建设专用导入 API 的设想。
 
-  验收：形成有依据的比较和选择结论，或明确待验证问题；Mapping 完整保全，最终导入或继续使用方式明确；现有代码及其他历史数据的处置明确。不默认立即重写系统。
+  已确认的权威数据与职责：Cashew 是唯一的交易业务数据来源及写入目标，保存当前交易名称、金额、日期、分类、钱包、场景标签和用户修改，以及初始化导入的历史交易。Mapping 在现有 Family Spending 项目中作为代码驱动的自动化服务运行：采集邮件、保存 EML、解析来源身份、读取 Cashew 当前记录，在内存中计算 Mapping 视图和标准化结果，提交新增或经审核的修改。
 
-  依赖：01 负责云端 Mapping 数据的基础保全，02 负责最终产品中的使用与迁移；选型研究可独立开展，正式数据迁移需有可用的保留副本。
+  持久化边界：Mapping 唯一额外长期保存的财务业务数据是内容寻址、幂等保存的原始 EML；不维护第二套交易数据库或 Cashew 镜像，不单独持久化解析结果、Mapping 视图、标准化结果、人工决定、ID 对应表、同步或邮箱采集游标。算法与规则由代码维护，代码、部署配置、密钥和必要日志仍按服务器规范管理。重启后从 EML 和 Cashew 当前数据重建内存状态，不再将 SQLite Mapping 数据库作为待选实现。
 
-  阶段状态（2026-10-23 用户确认及本地只读代码审阅）：以 Cashew Selfhosted 配合独立商户标准化服务为基本方向，进入实施前细节设计；02 保持未完成。尚未部署 Cashew、执行数据迁移或进行端到端验收，本轮仅更新任务记录。
+  初始化与日常运行分开：初始化可读取旧 Mapping、人工决定及其他历史数据，整理初始交易、分类和标签后导入 Cashew；初始化验收后旧 Mapping 不再是日常权威来源。验收前保留历史归档和旧实现，不直接删除现有 Mapping、EnrichmentDecision 或身份关联机制。日常每轮采集并保存新 EML → 分页读取 Cashew 当前数据集到内存 → 解析全部相关 EML 并重建来源关联及 Mapping 视图 → 计算新账单或已审核变更 → 同步提交 → 回读确认并记录必要日志；频率尚未确定。
 
-  已确认的架构与职责：信用卡邮件采集 → 自有原始 EML 证据与单笔交易解析 → 独立商户标准化服务及持久化数据库 → Cashew 专用交易导入接口 → Web/PWA 与 Android。自有服务负责来源身份、已审核 Mapping、可扩展规则与预测建议、人工审核决定、标准化结果、Cashew ID 对应及导入重试；Cashew 承担日常交易查看、编辑、分类、场景 Label 和分析交互，其中缺失能力需要补齐。数据库技术尚未选定，SQLite 仅为候选，不重建完整财务后端。
+  Mapping 与审核原则：从来源 description 与对应 Cashew 交易当前名称建立商户关联，再结合现有分类和标签计算新账单；不每轮用旧规则覆盖已有交易。同一 description 对应矛盾名称或分类时交审核，不任意取值；标准商户与消费场景仍为不同维度，不假定同一商户永远对应唯一场景标签。Cashew 用户修改成为下一轮计算输入。PC Mapping Review 操作的是内存视图，确认后直接更新受影响的 Cashew 交易并核对结果，不另存人工决定库，也不只写临时内存等待后续处理。
 
-  数据原则：原始邮件由自有持久存储保管；每笔交易有稳定来源 ID，重复抓取、解析和重试不得重复入账。预测建议、已审核规则和人工决定分开保存，建议不能自动覆盖已确认决定。标准化结果变化更新同一 Cashew 交易，导入方仅管理约定字段，保留用户的分类、Label 等修改。标准商户与消费场景是独立维度，不把商户 Mapping 当作场景 Label。
+  来源身份与幂等设计：以现有 SourceIdentity（来源类型、EML 身份、稳定交易位置）和固定命名空间按 UUID v5 生成确定性 transactionPk；具体命名空间和身份规范需在实现前固定并验证，不在每轮随机生成。初始化新建历史交易同样采用确定性 ID，不先经普通界面或 CSV 生成随机主键。同步 pk 与 payload.transactionPk 一致；已存在且无变化不写入，需要修改时保留 ID 并仅改变必要字段；失败或响应不明先回读再重试。已有随机 ID 的交易只在唯一可靠匹配时关联，歧义交人工确认，不改主键或默认新增本地 ID 表；人工关联在重启后如何可靠重建仍需验证。
 
-  代码依据与核验范围（2026-10-23）：
+  同步接入决定：第一阶段优先复用 Cashew 的 GET /sync/pull、POST /sync/push 及 /sync-stream，不预先开发通用 CRUD/专用导入 API，也不创建 Mapping 专用 Cashew 用户。Mapping 是逻辑读写参与者，仍需使用现有家庭数据集的有效授权；如确需认证调整，再评估最小改动。不直接修改运行中的 Cashew SQLite 文件，不预建复杂离线冲突系统。
 
-  - [Family Spending Insights main](https://github.com/LorewalkerAlex/family-spending-insights/tree/e1d36f266712abfcb4d020f5f0db546be25d6839) 当前为 `e1d36f2`（2026-09-29）。本地通过 GitHub 只读审阅 acquisition、evidence、parser、connector、source、mapping、enrichment、mapping_review 及文件证据存储代码：原始 EML 以 SHA-256 寻址并幂等保存；已有招行 HTML 解析、Decimal 金额、日期及来源定位处理，已有 description → merchant、merchant → default category 和人工决定、审核预览的实现基础。复用前仍需对新交易模型和账单语义核验，不整体迁移旧 Reconciliation、退款处理、Projection 或原前端。
-  - 公开 main 的 `connector.py` 是协议接口，该目录未见具体 IMAP 实现；但 01-B 保全的工作区以 `3ca7919` 为 HEAD，含未跟踪的 `sources/cmb_email/imap_163.py`、对应单元测试及已修改的 `runtime/composition.py`。本地只读确认 `Imap163Connector` 有 SSL 登录、只读邮箱选择、筛选和原始邮件拉取，并已接入 supervisor 组合路径；未运行测试或连接邮箱。因此存在可复用候选实现，不能因公开 main 缺文件就直接判定需要重写，也不能视为已通过新系统验证。
-  - [Cashew Selfhosted main](https://github.com/vfyuj/cashew-selfhosted/tree/fa516f8a4fc2399ae6922d0fb77fc10f9c28e7b1) 核对基准为 `fa516f8`。README 说明有 Flutter Web/PWA、自托管服务端和 Android；[交易表](https://github.com/vfyuj/cashew-selfhosted/blob/fa516f8a4fc2399ae6922d0fb77fc10f9c28e7b1/app/lib/database/tables.dart) 的 `transactionPk` 为字符串并默认 UUID，Label 表与交易 Label 字段仍被注释，不能算完整场景 Label 已具备。
-  - [CSV 导入代码](https://github.com/vfyuj/cashew-selfhosted/blob/fa516f8a4fc2399ae6922d0fb77fc10f9c28e7b1/app/lib/widgets/importCSV.dart) 插入时将主键设为 absent，使用新生成 ID，不作为按稳定来源 ID 更新的长期接口。[路由入口](https://github.com/vfyuj/cashew-selfhosted/blob/fa516f8a4fc2399ae6922d0fb77fc10f9c28e7b1/server/lib/src/api.dart) 与现有 API 文档未见专用外部交易 CRUD/导入接口。
-  - [服务端同步](https://github.com/vfyuj/cashew-selfhosted/blob/fa516f8a4fc2399ae6922d0fb77fc10f9c28e7b1/server/lib/src/sync/sync_routes.dart) 按 dataset、表、主键保存 `sync_records` 中的整行 payload 并依 modifiedAt 决定覆盖；[客户端](https://github.com/vfyuj/cashew-selfhosted/blob/fa516f8a4fc2399ae6922d0fb77fc10f9c28e7b1/app/lib/struct/liveSyncClient.dart) 将交易 payload 转为业务行。按 ID 同步的代码基础不等于字段级合并，也不能假设服务端已有可直接写入的同构交易业务表。以上仅为静态审阅，未验证实际跨设备同步、安全性或恢复能力。
+  协议约束：服务端 sync_records 保存数据集、表和主键对应的最新整行 payload，并非可直接写入的交易业务表。客户端使用 UpdateLogType.Transaction.name，即大小写敏感的 `Transaction`，不能猜成 `transactions`。提交完整、符合客户端序列化的交易，钱包/分类 ID 必须存在，pk、transactionPk、modifiedAt 与 payload 的 dateTimeModified 保持协议语义一致。读取当前记录后合并必要改动，保留用户其余字段，避免无变化重复写入；整行同步不提供自动字段级合并。push 的 conflictCount 不是逐条成功证明，必须回读核对，仍需验证与用户并发编辑时的行为。
 
-  待继续设计与验证的内容（仍属任务 02，不另建任务或据此启动实施）：
+  Reset Sync 与重建边界：重置会清空同步记录，要求 Cashew 客户端重上传本地数据。Mapping 无交易镜像，重置期间暂停写入，等待客户端重同步并确认数据集就绪后恢复；不得将空集当作完整数据后批量新增。每轮无持久游标的分页读取须处理 nextCursor、hasMore、删除标记及 409 rebootstrap/minRetainedSeq，明确合法重读起点和就绪判断；这些是待验证的协议处理，不代表已完成恢复实现。
 
-  1. 明确原始证据、来源交易、Mapping、规则及版本、预测建议、人工决定、标准化结果、Cashew ID 对应与导入状态的数据模型；验证来源 ID 在重试和解析变化时的稳定性，评估 SQLite 等存储方案。
-  2. 明确字段所有权、初始赋值和后续更新规则，保护 Cashew 中的人工分类与 Label；针对整行同步设计合并及并发冲突处理，验证导入与用户编辑交错时不会覆盖用户决定。
-  3. 设计专用的按来源 ID 幂等新增／更新 API、认证与家庭数据集权限、失败重试和状态恢复；不将内部 `/sync/push` 直接作为长期外部导入协议。服务端写入要复用并正确维护变更流及客户端业务行，验证 Web/Android 都能接收更新。
-  4. 补齐 Label 持久化、交易关联、界面、同步和场景分析设计，评估数据库迁移与原版 Cashew 备份兼容性；不能仅因表注释可取消就视为能力完成。
-  5. 评估人工审核界面放入 Cashew Fork 的成本，不合适时再考虑独立轻量界面；未知描述审核与预测候选确认需保留来源和人工决定。
-  6. 用代表性账单核对消费、退款、还款及金额方向如何映射到 Cashew，避免直接套用旧 Projection；公开 main 的金额解析使用 Decimal，而 Cashew 当前交易金额为 RealColumn，金额精度与往返转换也须验证。
-  7. 保留原始 Mapping 与人工决定，评估质量后确定复用和迁移路径。description → merchant 为拟保留核心；merchant 默认分类是否作为 Cashew 初始分类知识仍待决定，不能覆盖其后的用户修改。
-  8. 按实际需要验证 Cashew 部署、Web/Android 同步、认证、冲突和备份恢复；作者 README 提示不能保证代码质量及安全性，本轮未进行安全审计，不据此开放财务服务公网入口。
-  9. 确定各服务 Compose、数据及私密配置、恢复方法，再按用户选择验证专用导入、重复提交、失败重试及代表性账单端到端流程。已有 01-A/01-B 保全不等于数据已导入 Cashew。
+  代码依据与复用范围：
 
-  后续顺序仅作建议：先细化数据模型和字段所有权，再验证产品基础、导入接口、Label 及 Mapping 迁移；具体启动范围和顺序由用户决定。研究结论、源码能力与实施结果分别记录；选型和迁移路径尚未定稿，保持本项未完成，不改动其他任务。
+  - [Family Spending Insights 核对版本](https://github.com/LorewalkerAlex/family-spending-insights/tree/e1d36f266712abfcb4d020f5f0db546be25d6839)：2026-10-23 已静态核对 EML 内容寻址与幂等保存、招行 HTML 解析、Decimal 金额、日期及来源定位处理，原 Mapping 和审核预览仅作为初始化及逻辑参考。2026-10-24 补核 [SourceIdentity](https://github.com/LorewalkerAlex/family-spending-insights/blob/e1d36f266712abfcb4d020f5f0db546be25d6839/src/family_spending/domain/source.py)；它当前生成的是 src_ 前缀的哈希 ID，确定性 UUID 是新方案，不是已有 Cashew 集成能力。
+  - 01-B 保全工作区 HEAD 为 `3ca7919`，存在未跟踪的 `sources/cmb_email/imap_163.py`、对应单元测试，以及已修改并接入 supervisor 的 `runtime/composition.py`；2026-10-23 本地已只读核对。公开 main 的 connector 仅是协议，不能因此重写已有候选实现；未执行相关测试、连接邮箱或证明新系统可直接复用，不整体搬迁旧 Reconciliation、Projection、退款处理及前端。
+  - [Cashew 核对版本 fa516f8](https://github.com/vfyuj/cashew-selfhosted/tree/fa516f8a4fc2399ae6922d0fb77fc10f9c28e7b1)：已有 Web/PWA、Android 和行级同步的代码基础。[交易表](https://github.com/vfyuj/cashew-selfhosted/blob/fa516f8a4fc2399ae6922d0fb77fc10f9c28e7b1/app/lib/database/tables.dart) 的 transactionPk 为文本并默认 UUID v4；[CSV 导入](https://github.com/vfyuj/cashew-selfhosted/blob/fa516f8a4fc2399ae6922d0fb77fc10f9c28e7b1/app/lib/widgets/importCSV.dart) 使用新主键。Label 表及交易关联字段仍被注释，不能视为完整场景标签已具备。
+  - 2026-10-24 本地通过 GitHub 补核 [服务端同步](https://github.com/vfyuj/cashew-selfhosted/blob/fa516f8a4fc2399ae6922d0fb77fc10f9c28e7b1/server/lib/src/sync/sync_routes.dart)、[客户端同步](https://github.com/vfyuj/cashew-selfhosted/blob/fa516f8a4fc2399ae6922d0fb77fc10f9c28e7b1/app/lib/struct/liveSyncClient.dart) 和认证中间件：调用方提交 pk，服务端按认证用户确定 dataset；已有按 modifiedAt 的整行覆盖、分页和 Reset Sync 屏障。以上是固定版本的静态审阅，不代表实际写入、跨设备同步、安全审计或恢复已通过。
+
+  实施前仍需验证（保持在任务 02 内）：
+
+  1. 确定性 UUID 的固定命名空间、SourceIdentity 编码及重复执行稳定性；验证同一 EML 中的重复交易位置、随机 ID 旧交易的唯一匹配和重启重建，不保存额外本地关联库。
+  2. 在隔离数据集中验证现有授权、完整分页读取、钱包/分类 ID、完整交易序列化和无写入的 Mapping 计算；处理删除记录与 Reset Sync，不将第一次空读取当作导入依据。
+  3. 创建指定 ID 交易并确认 Web/PWA、Android 都可见；反向修改 Cashew 名称、分类和标签，验证下一轮 Mapping 视图反映修改；PC Review 更新后确认直接改变 Cashew 且不重复入账。
+  4. 验证无变化不写、整行更新保留用户字段、重复提交、响应丢失、冲突及重启恢复；Reset Sync 按暂停 Mapping、客户端重同步、确认就绪、重建内存视图的明确流程处理，不预建复杂恢复系统。
+  5. 确认 Label 是否另有实现；确无时在 Cashew Fork 补齐所需持久化、关联、界面、同步和分析能力，并核对数据库迁移及原版备份兼容性。标签以 Cashew 实际记录为准，不在 Mapping 中复制维护。
+  6. 用消费、退款和还款样本验证 Decimal 与 Cashew RealColumn/income 及金额符号转换、分类抵扣、收支汇总和编辑后的结果；接口接受 JSON 不等于语义正确。必要时评估最小扩展，不照搬旧 Projection。
+  7. 用现有 EML、Mapping 和历史人工决定做初始化迁移，比较记录数量、金额汇总、退款及代表性交易；保全副本仍保留，验收前不删除旧实现或归档。完成必要验证后确定正式轮询频率、Compose、数据/密钥位置、日志、备份和回退方式。
+
+  验收：产品选择、初始化迁移方案及必要验证有证据；Cashew 是唯一交易业务数据来源及写入目标，Mapping 只额外持久化 EML；稳定 ID 不重复入账，Cashew 用户修改能影响后续计算，PC 审核直接更新 Cashew；分类、标签、金额和退款语义符合需求，历史副本可用、迁移经过完整性核对，失败、重启及恢复流程明确。本次讨论不代表这些结果完成。
+
+  依赖与实施边界：01-A、01-B 已保全历史数据及工作区，02 负责初始化使用方式及迁移验证；不因代码与数据保全通过就视为新链路可用。建议按静态核对 → ID → 隔离读取及内存计算 → 指定 ID 写入和双向修改 → 语义、标签及恢复 → 初始化迁移逐步验证，实际启动范围和顺序仍由用户决定。本轮不部署、不实现、不迁移、不改其他任务。
 
 - [ ] **03. Tududi 使用与 Trail 数据迁移**
 

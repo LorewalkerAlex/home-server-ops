@@ -22,11 +22,13 @@ sources:
   cloud_export_handoff: {by: 用户转交 Web 数据保全交接, date: "2026-10-23", scope: 云端导出、目录比较及工作区快照按用户执行记录；未独立查询云端}
   cloud_export_local_review: {by: 本地 Codex, date: "2026-10-23", method: 只读计算现有 Windows 归档和清单文件的 SHA-256，扫描 tar 头并检查 Git 元数据路径, scope: 未执行数据库恢复、读取凭据内容或完整验证 Git 对象历史}
   cloud_export_acceptance: {by: 用户与本地 Codex 确认验收范围, date: "2026-10-23", decision: 接受私人电脑上的初始归档，取消 01-B 强制加密要求；01-A、01-B 完成，独立恢复与最终同步不冒充已完成}
+  cloud_final_handoff: {by: 用户转交 Web 01-D 最终导出报告, date: "2026-10-24", scope: 云端导出、记录数量、数据库清单、源目录比较和资源保留按用户执行记录；未独立查询云端}
+  cloud_final_local_review: {by: 本地 Codex, date: "2026-10-24", method: 只读核对 Windows 最终包大小、SHA-256、gzip 完整性、tar 结构及包内数据/项目清单，并与初始清单比较, scope: 未解压写盘、解读凭据内容、执行数据库恢复或检查云端实时状态}
 # 各节 source 对应上述来源；pending 为未验证项，intent 为用户设计。
 
 cloud_migration:
-  source: [cloud_export_handoff, cloud_export_local_review, cloud_export_acceptance]
-  stage: 初始数据、代码及配置保全完成，未完成正式迁移
+  source: [cloud_export_handoff, cloud_export_local_review, cloud_export_acceptance, cloud_final_handoff, cloud_final_local_review]
+  stage: 最终数据导出、打包、下载与文件完整性校验已交付；代码仍为 2026-10-23 快照，未恢复数据库或正式切换
   initial_archive:
     cloud_stage: /home/admin/cloud-export-20261023
     cloud_file: /home/admin/cloud-data-export-20261023.tar.gz
@@ -37,6 +39,40 @@ cloud_migration:
     local_verified: 归档哈希与交接云端值一致；659 个项目文件和 25 个数据文件全部匹配清单，无缺失；tar 头扫描通过
     privacy: 普通未加密 tar.gz，含私密配置及家庭财务资料，只保存在用户控制的私人存储，不上传公开 Git 或共享位置
     manifests: [manifest/projects-sha256sums.txt, manifest/data-sha256sums.txt, manifest/source-state.txt]
+  final_archive:
+    source: [cloud_final_handoff, cloud_final_local_review]
+    export_date: "2026-10-24"
+    cloud_stage: /home/admin/cloud-export-20261024-final
+    cloud_file: /home/admin/cloud-data-export-20261024-final.tar.gz
+    windows_file: 'E:\downloads\cloud-data-export-20261024-final.tar.gz'
+    archive_root: cloud-export-20261024-final/
+    bytes: 81973632
+    sha256: 43d6c48ab8cd54b4fac359a8bfd749ff699b25a7b8d62b4656925c402de73efb
+    local_verified: 包大小及哈希与交接一致；gzip 完整性及 994 个 tar 条目检查通过；包内 25 个数据文件、659 个项目文件均匹配清单，无缺失
+    redis:
+      archive_path: data/redis/redis.rdb
+      bytes: 17256394
+      sha256: f0d6ede45050e621c3990f4568ea601dc4ca9a66971928df934b220e9be9ccb1
+      user_reported: redis-check-rdb 通过，643703 个键；复制到独立最终暂存目录后的大小及哈希一致
+      local_verified: 包内文件大小及哈希与交接一致，未执行 redis-check-rdb 或独立恢复
+    mongodb:
+      archive_path: data/mongodb/javcrawl.archive.gz
+      bytes: 74121292
+      sha256: af05f53a5eba140d6f2f3a7c4e0a1ac2b4862d03071619d774aeb3e5f57d81e1
+      user_reported: mongodump 完成，报告 javcrawl.movie 共 317888 个文档；只读清单发现 admin/config/javcrawl/local，仅发现业务库 javcrawl 及 movie 集合
+      export_scope: 仅业务库 javcrawl，不单独迁移 MongoDB 系统数据库
+      local_verified: 包内文件大小及哈希与交接一致，未验证数据库可恢复性
+    family_spending:
+      archive_path: data/family-spending
+      final_copy: /home/admin/cloud-export-20261024-final/data/family-spending
+      user_reported: 云端源目录、2026-10-23 初始副本与最终副本均约 12MB，两次 diff -qr 无差异；沿用已有完整副本，未重新复制源目录
+      local_verified: 最终与初始 Family Spending 文件清单及哈希一致，最终包内对应文件均通过校验；未独立比较云端源目录
+    projects: 沿用 2026-10-23 的五项目快照；本次未重新同步代码或工作区变动，本地确认项目清单及哈希与初始副本一致
+    manifest_and_notes: 用户报告已更新数据清单及 README-EXPORT.txt，区分初始快照与最终数据
+    retention_reported: 初始归档、最终归档及暂存目录保留，云端业务容器仍运行；未删除数据、停服或清理云端资源
+    privacy: 含私密配置与家庭财务证据，仅存用户控制的私人存储，不上传公开 Git
+    time_scope: 用户报告最终导出日期，未提供精确快照时刻；归档不包含之后仍运行的云端服务产生的新写入
+  data_scope: 下方 data 为 2026-10-23 初始导出快照，最新导出结果见 final_archive，不混用文件大小及哈希
   data:
     redis:
       container: redis_jav
@@ -76,8 +112,8 @@ cloud_migration:
     mongodb: 使用新的 .partial 输出，成功且非空后转为正式文件；mongodump 使用临时 0600 配置中的 uri/password、archive/gzip 和 numParallelCollections=1，结束删除临时配置，不输出密码
     resources: 用户报告重查询后曾发生云服务器强制重启；未确定原因，避免无必要的全库统计和遍历，沿用低资源导出方式
     retention: 本地副本校验通过前不删除原始数据、旧归档或暂存目录，云端删除或停服仍需用户授权
-  limitations: Redis、MongoDB 尚未独立恢复验证；文件级校验不代表已恢复或完成生产切换，文件名中的 final 仍为本次初始副本
-  pending: 最终同步、必要恢复验证及正式切换由 01-D 执行；代理池实际 Redis 依赖在 01-C 按部署需要核对，不据此将其与 redis_jav 视为同源
+  limitations: Redis、MongoDB 尚未独立恢复验证；2026-10-23 文件名中的 final 仍属初始副本，2026-10-24 final 包是本次最终导出交付，均不代表家庭服务器部署或生产切换已完成
+  pending: 01-D 的必要恢复验证、家庭服务器迁移、公开代理服务切换与最终验收；代理池实际 Redis 依赖在 01-C 按部署需要核对，不据此将其与 redis_jav 视为同源
 
 server:
   source: [local]

@@ -25,6 +25,8 @@ sources:
   cloud_final_handoff: {by: 用户转交 Web 01-D 最终导出报告, date: "2026-10-24", scope: 云端导出、记录数量、数据库清单、源目录比较和资源保留按用户执行记录；未独立查询云端}
   cloud_final_local_review: {by: 本地 Codex, date: "2026-10-24", method: 只读核对 Windows 最终包大小、SHA-256、gzip 完整性、tar 结构及包内数据/项目清单，并与初始清单比较, scope: 未解压写盘、解读凭据内容、执行数据库恢复或检查云端实时状态}
   unified_url_handoff: {by: 用户转交 Tududi 统一 URL 方案讨论及设备限制, date: "2026-10-25", scope: 内网访问失败与路由器能力依据用户测试及确认；Split DNS 仅为倾向方案，未核验实时配置或实施变更}
+  caddy_ingress_review: {by: 本地 Codex, checked_at: "2026-10-25T16:19:04+08:00", method: SSH 读取现行部署声明及监听，并用现有 Caddy 的 /adapt 转换候选配置, scope: 监听快照采集于 16:08；候选未加载、未运行，现行文件及转换前后有效配置哈希未变；未执行 provisioning 校验或查询 UFW}
+  caddy_ingress_design: {by: 本地 Codex, date: "2026-10-25", method: 根据用户要求制定多服务 Web 入口及 Caddy 扩容规则, scope: 规范与候选方案，服务器实施及任务 11 验收尚未完成}
 # 各节 source 对应上述来源；pending 为未验证项，intent 为用户设计。
 
 cloud_migration:
@@ -301,6 +303,14 @@ services:
     http_port: 80
     https_port: 443
     caddyfile_sites: ["https://<TUDUDI_FQDN>", "http://<TUDUDI_FQDN>", "http://192.168.1.110"]
+    ingress_review:
+      source: [caddy_ingress_review]
+      current_file_sha256: 24fddceca29e6eceeb852cf1961ec0931aedaccb49a9141b6cf2c52191abd2cb
+      current_http_listeners: [":80", ":443"]
+      lan_4129_configured: false
+      declaration: Compose 仍为 host 网络、自定义镜像及单文件只读 bind，凭据由既有 env_file 注入；未读取凭据内容
+      candidate_result: 双入口候选通过现有 Caddy 的 /adapt 转换，包含 LAN 地址 4129、原 443/80、LAN 非允许来源 403、统一 AliDNS 策略及 h1/h2
+      verification_limit: 转换不会加载或运行配置；尚未执行 caddy validate、实际重载、LAN 4129 访问或 Split DNS 验收
     build:
       dockerfile: /srv/apps/caddy/Dockerfile
       base_images: ["caddy:2.11.4-builder-alpine", "caddy:2.11.4-alpine"]
@@ -431,15 +441,16 @@ network:
       user_confirmed: 真实外网访问、本轮实际使用、路由器唯一映射及旧映射清理、UFW 收尾、容器重建及两端配置校验一致
     future_standard_ports: 若以后标准端口可用，优先调整路由器及必要的跳转配置，保持服务器 443 与 Tududi 13002 不变
   unified_url_discussion:
-    source: [unified_url_handoff]
+    source: [unified_url_handoff, caddy_ingress_design]
     status: Planned
     target_url: "https://tududi.<DOMAIN>:4129"
+    reusable_goal: 后续获准 Web 服务沿用每服务子域名及内外网统一 4129 入口，Tududi 首项验收；扩容规则见 conventions.network.web_ingress
     user_reported_constraints: 家庭 LAN 使用该公网域名入口失败，路由器不能配置 NAT 回环或本地 DNS；约 5–6 台设备，包括两部手机及 3–4 台电脑
     acceptance_scope: 既有公网 HTTPS 验收不等于家庭 LAN 的同一域名及端口可用；当前 LAN HTTP 入口仍按 services.tududi 记录
     candidate: 服务器提供仅家庭 LAN 使用的 DNS，优先评估 dnsmasq，目标域名在家庭解析至 192.168.1.110；其余域名转发上游
     planned_lan_https: 需新增 192.168.1.110:4129 的域名 HTTPS 入口；既有公网 TCP 4129 到服务器 443 的映射保持
     execution: 仅方案讨论，未新增专项 DNS 服务、调整 Caddy/UFW 或修改设备 DNS，未将 53/4129 计入已验证监听
-    details: 目标、实施范围、验收及回退统一见 progress.md 任务 11；服务部署方式、上游和设备配置方法待核对
+    details: 目标、Caddy 候选片段、实施范围、验收及回退统一见 progress.md 任务 11；DNS 部署方式、上游和设备配置方法待核对
   interface: enp34s0
   ipv4: 192.168.1.110/24
   gateway: 192.168.1.1
@@ -504,6 +515,33 @@ conventions:
       public_web: 用户明确需要并授权后经 Caddy 接入，记录用途、访问范围、域名和完整转发链路
       public_checks: [DNS或DDNS, 路由器外部及内部端口, 监听地址, 对应协议族防火墙, Caddy站点及TLS与上游, 应用认证授权, IPv4与IPv6各自的暴露路径]
       internal_interfaces: 数据库、缓存及 Docker 管理接口等内部端口不直接公开；没有用途的公网端口保持关闭
+    web_ingress:
+      source: [caddy_ingress_design]
+      date: "2026-10-25"
+      scope: 后续 Web 服务的复用规则；当前双入口、Split DNS 和协议调整仍是任务 11 计划，不代表已部署
+      names: 每项服务使用明确子域名；同一服务内外网共用域名、HTTPS 和 4129 端口，以 Tududi 为首项验证
+      public_path: 公网 DNS/DDNS → 路由器 TCP 4129 → 服务器 443 → Caddy 按域名选择回环上游；新增 Web 服务共用该映射
+      lan_path: 家庭 DNS 将获准主机名解析至 192.168.1.110 → Caddy LAN 4129 → 同一上游；DNS 不负责改端口
+      access_classes:
+        public_and_lan: 经用户明确授权，在 443 与 LAN 4129 分别声明该服务域名；应用认证授权仍由应用负责
+        lan_only: 仅在 192.168.1.110 的 4129 声明域名，并限制来源 192.168.1.0/24；不创建该服务的公网 443 代理路由
+        ssh_only: 保留回环端口及 SSH 转发，不自动加入 Caddy；管理界面按实际用途另行授权
+      boundaries: 所有 LAN 4129 站点使用一致的 LAN 绑定及来源限制；没有公网 DNS 记录不构成访问控制，不配置通配兜底业务代理
+      upstreams: host 网络 Caddy 使用唯一、无冲突的 127.0.0.1 宿主机上游端口；不为每项 Web 服务另开公网端口
+      layout: 当前保留单个 Caddyfile，使用公共片段及每服务上游片段；服务增加时添加明确站点，不预建未部署服务的路由
+      tls: AliDNS DNS-01 在全局 acme_dns 统一配置，凭据仍引用既有环境变量；同一域名不同端口共用证书，不重复定义冲突策略，不启用按需签发
+      redirects: 保留自动证书管理，仅禁用自动 HTTP 跳转；需要的域名跳转显式指向 https://主机名:4129 并保留 URI，不开放公网 80
+      protocols: 当前按 TCP 链路规划 h1/h2，不额外监听或映射 HTTP/3 的 UDP；以后确有需求再核对 UDP 转发及通告端口
+      dns: 仅维护获准服务主机名的内网解析，其他域名正常转发；不覆盖整个父域，核对 A/AAAA 与设备加密 DNS 的影响
+      expansion: 先确定访问级别、域名、上游及应用外部 URL；按需配置公网 DNS、LAN DNS 和证书权限，再校验、应用并回归既有入口，最后更新事实与进度
+      change_control: 不修改全局 https_port；保留当前公网映射、LAN HTTP、DDNS 管理来源限制及证书数据目录；正式变更由用户执行
+      file_loading: 单文件 bind 更新时核对宿主机、容器文件及有效路由，确认旧 inode 问题后才重建；以后拆分 include 文件需同步调整挂载，不能仅创建容器不可见的片段
+      references:
+        checked: "2026-10-25"
+        globals: https://caddyserver.com/docs/caddyfile/options
+        snippets: https://caddyserver.com/docs/caddyfile/directives/import
+        binding: https://caddyserver.com/docs/caddyfile/directives/bind
+        conversion: https://caddyserver.com/docs/api#post-adapt
     firewall:
       - 不仅凭 UFW 默认拒绝或链的默认 DROP 判断容器端口安全；还需检查提前 ACCEPT、NAT、实际转发及访问路径
       - iptables 的 nf_tables API 与 Docker 原生 nftables 后端是不同概念，规则检查方法须与实际后端相符

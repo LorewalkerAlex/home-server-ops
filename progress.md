@@ -193,17 +193,57 @@
 
   验收：目标远程访问方式经过实际验证，是否需要额外服务及维护成本明确；公网暴露范围符合需求，不无必要地开放管理端口。
 
-- [ ] **11. Tududi 内外网统一 URL（Split DNS）**
+- [ ] **11. 统一 Web 入口与 Caddy 扩容（Split DNS，Tududi 首项验收）**
 
-  目标：家庭 Wi-Fi 与公司/外网均使用 `https://<TUDUDI_FQDN>:4129`。家庭请求直达 `192.168.1.110`，外网沿用现有入口；减少设备端操作，不引入 Cloudflare Tunnel 或额外 VPS。本项独立于已完成的网络规范和 03 的 Trail 迁移。
+  目标：以 Tududi 的 `https://<TUDUDI_FQDN>:4129` 为首项验证，建立后续 Web 服务可复用的内外网同 URL 入口及 Caddy 扩容规则。家庭请求直达 `192.168.1.110`，外网沿用现有入口；减少设备端操作，不引入 Cloudflare Tunnel 或额外 VPS。本项独立于已完成的网络规范和 03 的 Trail 迁移。
 
-  状态与依据（2026-10-25 用户交接）：仅讨论方案，尚未新增 DNS 服务、修改 Caddy/UFW 或调整设备 DNS；保持未完成。用户测试家庭 LAN 访问同一公网域名失败，并确认路由器不能配置 NAT 回环或本地 DNS，约需配置两部手机及 3–4 台电脑。已有服务和来源复用 facts.yaml，不将这些摘要当作本轮服务器检查。
+  状态与依据（2026-10-25）：用户确认家庭 LAN 访问同一公网域名失败，路由器不能配置 NAT 回环或本地 DNS，约需配置两部手机及 3–4 台电脑。本地 Codex 只读核对 Caddyfile、部署声明及监听，现行 Caddy 仍为 80/443，尚无 4129；DNS 53 见系统回环 stub 监听。完整候选经服务器现有 Caddy 的 `/adapt` 转换通过，LAN 4129 的绑定、先拒绝非 LAN 再代理及统一 AliDNS 策略符合方案；仅有格式提示，不等于 `caddy validate`、实际运行或访问验收。转换前后有效配置哈希及现行文件未变。未新增 DNS 服务、修改 Caddy/UFW 或调整设备 DNS，任务保持未完成。
 
   倾向方案：在家庭服务器部署仅服务 LAN 的轻量 DNS，优先评估 dnsmasq。仅为目标主机名提供内网解析，其他域名转发上游，不启用广告过滤、DHCP 或额外拦截。各设备按家庭 Wi-Fi 设置 DNS，离家后不依赖家庭 DNS；不把公共 DNS 与家庭 DNS 无条件并列备用，避免客户端绕过内网解析。具体部署方式、上游、缓存及故障行为尚未决定。
 
   端口与访问范围：DNS 改解析地址不改 URL 端口，家庭请求会直连服务器 4129，不能只增加 DNS 记录。Caddy 当前 host 网络监听 80/443、Tududi 上游为 `127.0.0.1:13002`；拟新增绑定服务器 LAN 地址且仅允许 `192.168.1.0/24` 的域名 HTTPS 4129 入口，复用证书及上游。公网路由器 `4129 → 192.168.1.110:443` 保持，不增加公网 DNS 或直达服务器 4129 的映射。新增 DNS TCP/UDP 53 只允许家庭 LAN；核对 IPv6 及 Docker 转发路径，不能仅凭 UFW 或无路由器映射断言不暴露。
 
-  实施前最小核验：检查实际 53/4129 监听、systemd-resolved/其他解析服务及上游，选择明确监听地址，避免端口占用或 DNS 转发回环，不默认停用系统解析器。读取现行 Caddyfile/有效路由及部署声明，确认新增入口的 Host、TLS、绑定及重载方式，不用仓库摘要覆盖完整配置。复用 conventions.network 和 conventions.deployment，具体变更与设备操作经用户授权后逐步执行。
+  Caddy 调整：保留单个 Caddyfile，将 AliDNS DNS-01 集中到全局；同一服务用一份上游片段，分别声明公网 443 和 LAN 4129。关闭自动 HTTP 跳转，仅保留显式指向 `:4129` 的跳转；按现有 TCP 链路使用 HTTP/1.1、HTTP/2。不要将全局 `https_port` 改为 4129。以下为**候选差异片段，尚未部署，不能覆盖整个文件**；正式文件中原 `http://192.168.1.110` 整块须原样保留，包括 Tududi 根路径、DDNS 前缀处理及 LAN 限制。
+
+  ```caddyfile
+  {
+      auto_https disable_redirects
+      servers {
+          protocols h1 h2
+      }
+      acme_dns alidns {
+          access_key_id {env.ALIYUN_ACCESS_KEY_ID}
+          access_key_secret {env.ALIYUN_ACCESS_KEY_SECRET}
+      }
+  }
+
+  (tududi_proxy) {
+      reverse_proxy 127.0.0.1:13002
+  }
+
+  (lan_only) {
+      @outside_lan not remote_ip 192.168.1.0/24
+      respond @outside_lan "Forbidden" 403
+  }
+
+  https://<TUDUDI_FQDN> {
+      import tududi_proxy
+  }
+
+  https://<TUDUDI_FQDN>:4129 {
+      bind 192.168.1.110
+      import lan_only
+      import tududi_proxy
+  }
+
+  http://<TUDUDI_FQDN> {
+      redir https://<TUDUDI_FQDN>:4129{uri} 308
+  }
+  ```
+
+  扩容按 `facts.yaml → conventions.network.web_ingress`：每项服务一个子域名，先确定公网加 LAN、仅 LAN 或仅 SSH；只给获准公网服务增加 443 站点，仅 LAN 服务只加绑定及来源受限的 4129 站点。应用上游用独立回环端口，Web 入口共用 4129，不另加路由器映射。按需维护该主机名的公网及 LAN DNS、证书权限和应用外部 URL，测试后更新文档；本轮不为其他服务新增路由或变更访问级别。
+
+  实施与最小核验：复用本轮监听与配置快照；若实施时已变化，再做差异检查。进一步确认系统解析服务、DNS 上游及绑定方式，避免端口冲突和转发回环，不默认停用系统解析器。用户先保存现行可用 Caddyfile，再在既有插件和环境变量下校验完整候选，通过后才应用并重载；核对容器确实读取新文件，只有确认单文件 bind 旧 inode 问题时才强制重建。当前 Compose 不声明 build，本次配置调整不要求重建镜像。不要将 `/adapt` 通过当作运行校验；失败先分析并回退。具体服务器变更与设备操作由用户执行。
 
   设备与 DNS 验证：确认各手机/电脑平台能否按家庭网络设置 DNS，核对实际使用的解析器、A/AAAA、浏览器安全 DNS、系统私有 DNS 或 VPN 是否绕过家庭解析；不预设每个平台均支持相同配置。明确家庭 DNS 不可用时的行为与恢复原 DNS 的办法，核验离家/切换网络后的正常解析，不以全局固定家庭 DNS 代替按网络配置。
 
@@ -211,6 +251,6 @@
 
   回退与边界：变更前保存现行可用配置及试点设备 DNS 设置。回退先恢复受影响设备原 DNS，再撤销本次新增 DNS、Caddy 4129 配置及专属放行规则，保留原 443、公网映射和 LAN HTTP 链路；按实际影响安排停用顺序并验证恢复，不依赖已删除的旧 .bak。只修改任务所需范围，不改 Tududi 内部端口、数据库或 Trail 数据，不新增公网管理入口。
 
-  技术参考（2026-10-25 查阅，非本机核验）：[dnsmasq 手册](https://thekelleys.org.uk/dnsmasq/docs/dnsmasq-man.html)、[Caddy 站点地址](https://caddyserver.com/docs/caddyfile/concepts#addresses)、[Caddy bind](https://caddyserver.com/docs/caddyfile/directives/bind)、[systemd-resolved](https://www.freedesktop.org/software/systemd/man/latest/systemd-resolved.service.html)。最终配置按现行版本及最小核验结果确定。
+  技术参考（2026-10-25 查阅；规范和转换接口另见 conventions.network.web_ingress.references，不代表部署验收）：[dnsmasq 手册](https://thekelleys.org.uk/dnsmasq/docs/dnsmasq-man.html)、[Caddy 站点地址](https://caddyserver.com/docs/caddyfile/concepts#addresses)、[Caddy bind](https://caddyserver.com/docs/caddyfile/directives/bind)、[systemd-resolved](https://www.freedesktop.org/software/systemd/man/latest/systemd-resolved.service.html)。最终配置按现行版本及最小核验结果确定。
 
 用户选择任务后，再补充当时所需的参数、配置片段、操作约束、验证及回滚方式。研究结论或实施结果由本地 Codex 根据证据更新状态，服务器变更由用户授权；新需求由用户决定是否加入清单。交接和公开内容须脱敏，计划不得写成部署事实。

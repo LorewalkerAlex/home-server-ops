@@ -27,6 +27,7 @@ sources:
   unified_url_handoff: {by: 用户转交 Tududi 统一 URL 方案讨论及设备限制, date: "2026-10-25", scope: 内网访问失败与路由器能力依据用户测试及确认；Split DNS 仅为倾向方案，未核验实时配置或实施变更}
   caddy_ingress_review: {by: 本地 Codex, checked_at: "2026-10-25T16:19:04+08:00", method: SSH 读取现行部署声明及监听，并用现有 Caddy 的 /adapt 转换候选配置, scope: 监听快照采集于 16:08；候选未加载、未运行，现行文件及转换前后有效配置哈希未变；未执行 provisioning 校验或查询 UFW}
   caddy_ingress_design: {by: 本地 Codex, date: "2026-10-25", method: 根据用户要求制定多服务 Web 入口及 Caddy 扩容规则, scope: 规范与候选方案，服务器实施及任务 11 验收尚未完成}
+  interaction_agreement: {by: 用户要求、本地 Codex 整理, date: "2026-10-25", method: 统一服务器操作交互与临时文件管理方式, scope: 协作约定，不表示服务器已建立临时目录或清理现有文件}
 # 各节 source 对应上述来源；pending 为未验证项，intent 为用户设计。
 
 cloud_migration:
@@ -493,6 +494,20 @@ operations:
   backup_plan: 服务基本稳定后再建设 persistent 备份，尚未建立经恢复验证的方案
 
 conventions:
+  server_interaction:
+    source: [interaction_agreement]
+    scope: 本地 Codex 与 Web 指导服务器操作时共用；不改变既有权限和用户执行变更的分工
+    inspection: 本地 Codex 优先通过已有只读访问完成任务相关检查；需要管理员权限的最小检查由用户执行，不要求重跑已有有效证据
+    default_delivery: 简单操作直接给可复制命令，用户在已有 SSH 会话执行；不为几条命令默认生成、上传独立脚本
+    command_format: 标明执行位置、所需权限、作用及预期结果；按可验证的小步提供，遇到失败先分析，不让用户继续执行依赖失败步骤的命令
+    inline_code: 少量多行逻辑可使用带引号分隔符的 heredoc；较长逻辑应保持可审查，不把复杂部署隐藏在单条命令或编码内容中
+    script_use: 复杂或需重复执行的操作可以交付脚本或配置包，同时说明内容、运行命令、验证、回退及文件去向；不要求用户为每个步骤另存脚本
+    temporary_directory: /tmp/home-server-ops/<任务标识>-<唯一后缀>/
+    temporary_rules: 仅在需要落盘时由用户创建任务专属目录，限制为执行账号访问；一次性脚本、上传包和候选文件集中放置，home 不作为默认暂存位置
+    durable_files: 正式配置、长期维护脚本和必要回退资料放在约定的服务或持久路径；临时目录可能被清理，不能作为重要资料的唯一副本
+    results: 用户返回必要的脱敏输出；本地 Codex 能直接只读复核的部分自行核验，验收后更新事实、任务和 Git，未执行的操作保持未完成
+    cleanup: 交付时说明本次临时文件清单与清理方式，验收后清理已确认无用的临时产物；失败时保留排查资料，回退资料按保留约定处理，不按通配符批删 home 或其他目录
+
   network:
     source: [network_handoff]
     accepted: "2026-10-23"

@@ -35,6 +35,7 @@ sources:
   rollback_exit_decision: {by: 用户要求、本地 Codex 整理, date: "2026-10-25", method: 为每次变更的临时回退副本定义退出和清理规则, scope: 默认本次变更或阶段验收后清理；不将父任务未完作为无限保留理由}
   caddy_backup_exit_review: {by: 本地 Codex, checked_at: "2026-10-25T17:51:09+08:00", method: SSH 只读检查本次副本元数据、正式配置哈希及配置引用, scope: 副本存在且未被Caddyfile或Compose引用，正式配置未变；未读取副本内容或删除文件，退出条件依据已完成的阶段验收}
   caddy_rollback_cleanup_review: {by: 本地 Codex, checked_at: "2026-10-25T18:12:21+08:00", method: SSH只读对准确回退文件路径执行lstat并得到不存在结果, scope: 确认该副本当前不存在；未执行删除，不推定其他临时文件也已清理}
+  hdd_transfer_handoff: {by: 用户转交05.3单文件迁移链路交接并确认, received: "2026-10-25", execution_time: 未提供精确时间, scope: 只读挂载、单文件传输及校验和播放、Windows目标及临时环境影响按用户报告；本地未独立读取文件、核对哈希或播放}
 # 各节 source 对应上述来源；pending 为未验证项，intent 为用户设计。
 
 cloud_migration:
@@ -159,7 +160,7 @@ storage:
       startup: Docker 和 containerd 依赖挂载，并校验 UUID
       pending: [缺盘故障测试]
   hdd:
-    source: [local, hdd_handoff, hdd_recovery_handoff]
+    source: [local, hdd_handoff, hdd_recovery_handoff, hdd_transfer_handoff]
     device: /dev/sda
     capacity: 约 3TB
     partitions_observed: 2
@@ -203,7 +204,7 @@ storage:
       operations_reported: 本轮未修改服务器配置、挂载硬盘、安装恢复工具、修复文件系统或写入原盘
     recovery_reported:
       source: [hdd_recovery_handoff]
-      result: Storage Spaces 用户虚拟磁盘映射、GPT 验证、NTFS 只读挂载和原目录访问成功，尚未迁移数据
+      result: Storage Spaces用户虚拟磁盘映射、GPT验证、NTFS只读挂载和原目录访问成功；后续单文件迁移结果见single_file_transfer_reported
       metadata:
         parsed_signatures: [SPACEDB, SDBC, SDBB]
         identity_checks: 交接报告存储池及物理磁盘 GUID 校验通过，不记录 GUID 值
@@ -224,14 +225,34 @@ storage:
         access: 原根目录及影片目录可访问，已列出影片文件名和大小；一份约 29.3GB 文件被 file 识别为 MP4
         limits: 未完成全部影片的解码、播放或复制校验，不能据目录访问及文件类型识别认定全部数据完整
       reboot_persistence:
+        source: [hdd_recovery_handoff, hdd_transfer_handoff]
         automatic_restore_configured: false
-        table_storage: /run 临时文件系统，重启后表文件不保留
+        table_storage: /run临时文件系统，用户报告映射表仍为root-only，重启后不保留
         effects: Device Mapper、loop 和挂载不会按当前方案自动恢复；临时状态消失不等于原 HDD 数据丢失
-        parser_status: 成功的完整 Python 解析器仅在 Web 对话以内联命令执行，未随本次交接提供，尚未保存为经本地审查的版本控制脚本
+        parser_status: 用户报告Shell历史中仍有内联代码，完整Python解析程序尚未保存为经审查的独立版本；不据此认定历史代码已完整保全或可独立恢复
         restoration_scope: 只有部分已用命令及参数，不构成可脱离对话独立执行的完整恢复方案
-        constraint: 保存完整解析逻辑、必要校验及恢复步骤前，不主动重启服务器；不据摘要重写或猜测映射算法
+        constraint: 固化完整解析逻辑、必要校验和恢复步骤前不主动重启，不清理活动映射、loop、挂载或映射表；不据摘要重写或猜测映射算法
       original_disk_writes: 用户确认未格式化、重新分区、修复文件系统或对原盘主动写入；映射和挂载均为只读
-    pending: [完整解析程序与映射恢复步骤固化, SMART 健康信息, 原盘镜像及迁移目标空间可行性, 私人文件清单, 单文件传输及播放验证, 所需数据迁移及完整性验证, 数据保全后 HDD 长期布局与备份恢复规划]
+    single_file_transfer_reported:
+      source: [hdd_transfer_handoff]
+      acceptance: 单文件读取、传输、完整性及实际播放链路通过，依据用户确认
+      source_mount: {path: /mnt/storage-space-7-poc, filesystem: ntfs3, options_reported: [ro]}
+      windows_target: 'F:\ServerHDD'
+      target_layout: 目标根目录已由用户准备，按原HDD相对路径保留结构
+      sample: {format: MP4, approximate_size_mib: 822.4, source_bytes: 862385003, destination_bytes: 862385003}
+      integrity: 两端SHA-256一致，用户未提供具体哈希值，本地未独立计算
+      playback: 用户实际确认可正常播放及拖动进度条
+      transport: Windows PC上使用Python Paramiko经现有SSH/SFTP直接下载，只读读取服务器挂载；服务器未创建迁移脚本或服务
+      inventory_scope: 用户报告此前完成顶层目录及容量盘点，详细结果本轮未提供；全部目录的保留范围仍由用户确定，不默认仅迁移影片
+      local_environment_reported:
+        invocation: uv run --no-project --with paramiko
+        installed_package_count: 7
+        project_dependencies: 用户报告未修改全局Python项目依赖
+        temporary_script: 用户报告成功后按命令删除
+        uv_cache: 相关包可能仍在uv缓存，未清理；后续只按明确相关范围处理，不清空整个缓存
+      server_effects_reported: 未安装软件、创建新服务或写入原HDD；活动只读映射和挂载保留
+      limits: 只验收一个样本，不证明全部HDD文件完整或所需数据均已迁移；本地Web迁移工具尚未开发
+    pending: [完整解析程序与映射恢复步骤固化, 用户确定全部目录保留范围, SMART健康信息及原盘镜像可行性, 全量迁移所需目标空间核对, 私人文件清单, 全部所需数据迁移及逐项完整性验证, 数据保全后HDD长期布局与备份恢复规划]
     constraint: 未挂载不代表空盘；未经明确证据与授权，不格式化、不重新分区、不修复文件系统、不向原盘写入；不公开序列号、WWN、完整 GUID 或原始元数据转储
 
 directories:

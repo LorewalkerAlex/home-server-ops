@@ -30,6 +30,8 @@ sources:
   interaction_agreement: {by: 用户要求、本地 Codex 整理, date: "2026-10-25", method: 统一服务器操作交互与临时文件管理方式, scope: 协作约定，不表示服务器已建立临时目录或清理现有文件}
   caddy_applied_handoff: {by: 用户, date: "2026-10-25", method: 提供部署脚本 validate、原位写入、容器文件哈希核对及 reload 成功输出, scope: 备份路径、运行校验及部署操作按用户输出；未修改 UFW、DNS、路由器、镜像或 Compose}
   caddy_applied_review: {by: 本地 Codex, checked_at: "2026-10-25T17:36:46+08:00", method: SSH 只读核对正式文件、有效路由、监听及 HTTP/TLS，并从 Windows 直连 LAN 4129, scope: 服务器本机 Caddy 检查通过；Windows LAN 4129 连接超时；未查询 UFW、修改客户端 DNS、验证公网端到端或登录应用}
+  ufw_4129_handoff: {by: 用户, date: "2026-10-25", method: 提供 ufw allow 成功及当前 status verbose 输出, scope: 规则和默认策略按用户输出；IPv6 未独立复核}
+  lan_4129_review: {by: 本地 Codex, checked_at: "2026-10-25T17:44:55+08:00", method: Windows curl 指定 LAN 地址直连域名4129并回归443及原LAN HTTP和DDNS入口, scope: 4129与443均HTTP200且证书校验通过，原LAN HTTP及DDNS登录页200；未修改DNS、登录应用或验证真实外网}
 # 各节 source 对应上述来源；pending 为未验证项，intent 为用户设计。
 
 cloud_migration:
@@ -307,15 +309,15 @@ services:
     https_port: 443
     caddyfile_sites: ["https://<TUDUDI_FQDN>", "https://<TUDUDI_FQDN>:4129", "http://<TUDUDI_FQDN>", "http://192.168.1.110"]
     ingress_review:
-      source: [caddy_applied_handoff, caddy_applied_review]
+      source: [caddy_applied_handoff, caddy_applied_review, ufw_4129_handoff, lan_4129_review]
       current_file_sha256: 4c912285f0c4b7b23bb7a0f06a2fb84fd7973e49cd442681627375dbbb5078ac
       current_http_listeners: [":80", ":443", "192.168.1.110:4129"]
       lan_4129_configured: true
       declaration: Compose 与审查基线相同；仍为 host 网络、自定义镜像、单文件只读 bind 及既有 env_file，未读取凭据
       tls_and_protocols: AliDNS DNS-01 改为全局统一策略，显式 HTTP 跳转保留 4129，所有 HTTP 服务器使用 h1/h2；未见 443/4129 UDP 监听
       local_result: 服务器本机的 443 与 LAN 地址 4129 均为可信 TLS及 HTTP200，4129 对回环来源返回403；原 LAN HTTP 和 DDNS 路由及来源限制回归通过
-      windows_lan_result: 本地 Windows 使用指定 LAN 地址直连域名4129，3秒连接超时；尚未确定原因，不能据本机200声称其他 LAN 设备已可访问
-      verification_limit: 配置阶段已通过；UFW 当前规则、Split DNS、其他 LAN 设备及真实外网端到端仍待核验，未登录应用
+      windows_lan_result: 用户添加精确 LAN TCP4129 放行后，本地 Windows 指定192.168.1.110访问域名4129返回HTTP200且证书校验通过；此前超时已消除，未借此声称Split DNS已生效
+      verification_limit: Caddy及本地Windows到LAN4129链路已通过；UFW依据用户输出，Split DNS、其他设备及真实外网端到端仍待验收，未登录应用
       deployment_reported:
         method: 用户运行脚本校验后原位更新，宿主机与容器文件哈希一致并热重载成功
         rollback_file: /srv/apps/caddy/Caddyfile.before-unified-20261025T093536511233Z
@@ -450,15 +452,15 @@ network:
       user_confirmed: 真实外网访问、本轮实际使用、路由器唯一映射及旧映射清理、UFW 收尾、容器重建及两端配置校验一致
     future_standard_ports: 若以后标准端口可用，优先调整路由器及必要的跳转配置，保持服务器 443 与 Tududi 13002 不变
   unified_url_discussion:
-    source: [unified_url_handoff, caddy_ingress_design, caddy_applied_handoff, caddy_applied_review]
+    source: [unified_url_handoff, caddy_ingress_design, caddy_applied_handoff, caddy_applied_review, ufw_4129_handoff, lan_4129_review]
     status: Pending verification
     target_url: "https://tududi.<DOMAIN>:4129"
     reusable_goal: 后续获准 Web 服务沿用每服务子域名及内外网统一 4129 入口，Tududi 首项验收；扩容规则见 conventions.network.web_ingress
     user_reported_constraints: 家庭 LAN 使用该公网域名入口失败，路由器不能配置 NAT 回环或本地 DNS；约 5–6 台设备，包括两部手机及 3–4 台电脑
     acceptance_scope: 既有公网 HTTPS 验收不等于家庭 LAN 的同一域名及端口可用；当前 LAN HTTP 入口仍按 services.tududi 记录
     candidate: 服务器提供仅家庭 LAN 使用的 DNS，优先评估 dnsmasq，目标域名在家庭解析至 192.168.1.110；其余域名转发上游
-    lan_https: Caddy 已新增 192.168.1.110:4129 并限制 LAN 来源；既有公网映射未改，Windows LAN 直连仍超时
-    execution: Caddy 配置、校验与重载完成，4129 已监听；未新增 LAN DNS 服务、调整 UFW 或设备 DNS，完整统一 URL 尚未验收
+    lan_https: Caddy 已新增192.168.1.110:4129并限制LAN来源；精确UFW放行后Windows直连返回可信HTTPS200，既有公网映射未改
+    execution: Caddy配置与LAN TCP4129放行已完成并复测通过；尚未新增LAN DNS服务或调整设备DNS，完整统一URL任务未完成
     details: 目标、Caddy 配置片段、实施范围、验收及回退统一见 progress.md 任务 11；DNS 部署方式、上游和设备配置方法待核对
   interface: enp34s0
   ipv4: 192.168.1.110/24
@@ -466,13 +468,15 @@ network:
   netplan: {file: /etc/netplan/00-installer-config.yaml, dhcp4: false, dhcp6: true}
   ipv6: {global_scope_address_observed: true, address: 不公开}
   ufw:
-    rules_source: [https_final_handoff, network_handoff]
+    rules_source: [https_final_handoff, network_handoff, ufw_4129_handoff]
     active: true
     default: {incoming: deny, outgoing: allow, routed: deny}
-    default_last_verified: "2026-10-21"
-    latest_report: {source: [network_handoff], default_unchanged_reported: true, ipv6_config_enabled: true, ipv6_user_allow_rules_shown: false, scope: 交接摘要报告 IPV6=yes、未显示对应 v6 用户放行规则；不等于 IPv6 无流量或公网安全已验证}
+    default_last_verified: "2026-10-25"
+    previous_report: {source: [network_handoff], default_unchanged_reported: true, ipv6_config_enabled: true, ipv6_user_allow_rules_shown: false, scope: 交接摘要报告 IPV6=yes、未显示对应 v6 用户放行规则；不等于 IPv6 无流量或公网安全已验证}
+    latest_report: {source: [ufw_4129_handoff], result: UFW active且默认策略不变，新增精确LAN TCP4129放行，原22/80/443保留, scope: 用户实际输出；本地未查询sudo规则或独立复核IPv6}
     user_rules:
       - {from: 192.168.1.0/24, protocol: tcp, ports: [22, 80], action: allow}
+      - {from: 192.168.1.0/24, to: 192.168.1.110, protocol: tcp, ports: [4129], action: allow, source: [ufw_4129_handoff]}
       - {from: 0.0.0.0/0, protocol: tcp, ports: [443], action: allow, scope: 用户确认保留公网 443、删除公网 80，IPv6 未独立复核}
     removed: 公网 TCP 80 放行规则，用户确认
   firewall_snapshot_reported:

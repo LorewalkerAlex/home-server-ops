@@ -249,7 +249,7 @@
 
   验收：家庭 Wi-Fi 下目标域名解析到 `192.168.1.110`，同一 HTTPS URL 可访问，证书可信且域名匹配，请求走内网；其他常见网站解析及访问正常。设备离开家庭网络后 DNS 正常，外网同一 URL 仍可用。DNS 53 与新增 HTTPS 4129 的实际监听、来源限制及相关协议族符合 LAN 范围，公网不可访问这些新增入口；原公网 443 链路、DDNS、Caddy 路由和 DDNS 管理路径不受影响。保留可复现的脱敏配置、验证位置/时间与结果，不把计划视为成功。
 
-  回退与边界：用户输出确认当前回退文件为 `/srv/apps/caddy/Caddyfile.before-unified-20261025T093536511233Z`，本地未读取；继续保留，不依赖已删除的旧 .bak。后续变更前保存现行可用配置及试点设备 DNS 设置。回退先恢复受影响设备原 DNS，再撤销本次新增 DNS、Caddy 4129 配置及专属放行规则，保留原 443、公网映射和 LAN HTTP 链路；按实际影响安排停用顺序并验证恢复。只修改任务所需范围，不改 Tududi 内部端口、数据库或 Trail 数据，不新增公网管理入口。
+  回退与边界：本次 `/srv/apps/caddy/Caddyfile.before-unified-20261025T093536511233Z` 的保留目的为 Caddy 配置变更失败时回退；该阶段已验收，退出条件满足，待用户精确删除。本地已确认文件存在且正式配置未引用，未读取内容或删除，不再将它作为后续回退前提。后续变更按自身范围保存必需的配置及设备 DNS 设置，并同时约定退出条件；Split DNS 失败时先恢复设备原 DNS，再撤销该次新增 DNS 及专属规则，保持已验收的 Caddy 和 LAN4129 链路。只修改任务所需范围，不改 Tududi 内部端口、数据库或 Trail 数据，不新增公网管理入口。
 
   技术参考（2026-10-25 查阅；规范和转换接口另见 conventions.network.web_ingress.references，不代表部署验收）：[dnsmasq 手册](https://thekelleys.org.uk/dnsmasq/docs/dnsmasq-man.html)、[Caddy 站点地址](https://caddyserver.com/docs/caddyfile/concepts#addresses)、[Caddy bind](https://caddyserver.com/docs/caddyfile/directives/bind)、[systemd-resolved](https://www.freedesktop.org/software/systemd/man/latest/systemd-resolved.service.html)。最终配置按现行版本及最小核验结果确定。
 

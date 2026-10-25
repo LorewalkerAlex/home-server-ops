@@ -32,6 +32,8 @@ sources:
   caddy_applied_review: {by: 本地 Codex, checked_at: "2026-10-25T17:36:46+08:00", method: SSH 只读核对正式文件、有效路由、监听及 HTTP/TLS，并从 Windows 直连 LAN 4129, scope: 服务器本机 Caddy 检查通过；Windows LAN 4129 连接超时；未查询 UFW、修改客户端 DNS、验证公网端到端或登录应用}
   ufw_4129_handoff: {by: 用户, date: "2026-10-25", method: 提供 ufw allow 成功及当前 status verbose 输出, scope: 规则和默认策略按用户输出；IPv6 未独立复核}
   lan_4129_review: {by: 本地 Codex, checked_at: "2026-10-25T17:44:55+08:00", method: Windows curl 指定 LAN 地址直连域名4129并回归443及原LAN HTTP和DDNS入口, scope: 4129与443均HTTP200且证书校验通过，原LAN HTTP及DDNS登录页200；未修改DNS、登录应用或验证真实外网}
+  rollback_exit_decision: {by: 用户要求、本地 Codex 整理, date: "2026-10-25", method: 为每次变更的临时回退副本定义退出和清理规则, scope: 默认本次变更或阶段验收后清理；不将父任务未完作为无限保留理由}
+  caddy_backup_exit_review: {by: 本地 Codex, checked_at: "2026-10-25T17:51:09+08:00", method: SSH 只读检查本次副本元数据、正式配置哈希及配置引用, scope: 副本存在且未被Caddyfile或Compose引用，正式配置未变；未读取副本内容或删除文件，退出条件依据已完成的阶段验收}
 # 各节 source 对应上述来源；pending 为未验证项，intent 为用户设计。
 
 cloud_migration:
@@ -309,7 +311,7 @@ services:
     https_port: 443
     caddyfile_sites: ["https://<TUDUDI_FQDN>", "https://<TUDUDI_FQDN>:4129", "http://<TUDUDI_FQDN>", "http://192.168.1.110"]
     ingress_review:
-      source: [caddy_applied_handoff, caddy_applied_review, ufw_4129_handoff, lan_4129_review]
+      source: [caddy_applied_handoff, caddy_applied_review, ufw_4129_handoff, lan_4129_review, caddy_backup_exit_review]
       current_file_sha256: 4c912285f0c4b7b23bb7a0f06a2fb84fd7973e49cd442681627375dbbb5078ac
       current_http_listeners: [":80", ":443", "192.168.1.110:4129"]
       lan_4129_configured: true
@@ -321,7 +323,8 @@ services:
       deployment_reported:
         method: 用户运行脚本校验后原位更新，宿主机与容器文件哈希一致并热重载成功
         rollback_file: /srv/apps/caddy/Caddyfile.before-unified-20261025T093536511233Z
-        rollback_scope: 用户输出确认创建；本地未读取该回退文件，不引用已删除的旧 .bak
+        rollback_scope: 用户输出确认创建；本地只读确认文件存在且正式配置未引用，未读取内容
+        rollback_exit: Caddy及LAN4129阶段验收已通过，退出条件满足，待用户精确删除；不再作为后续Split DNS任务的回退前提
     build:
       dockerfile: /srv/apps/caddy/Dockerfile
       base_images: ["caddy:2.11.4-builder-alpine", "caddy:2.11.4-alpine"]
@@ -508,7 +511,7 @@ operations:
 
 conventions:
   server_interaction:
-    source: [interaction_agreement]
+    source: [interaction_agreement, rollback_exit_decision]
     scope: 本地 Codex 与 Web 指导服务器操作时共用；不改变既有权限和用户执行变更的分工
     inspection: 本地 Codex 优先通过已有只读访问完成任务相关检查；需要管理员权限的最小检查由用户执行，不要求重跑已有有效证据
     default_delivery: 简单操作直接给可复制命令，用户在已有 SSH 会话执行；不为几条命令默认生成、上传独立脚本
@@ -518,9 +521,9 @@ conventions:
     upload_method: 分两步交付，先给本地 PowerShell 上传命令，收到上传结果后单独给可复制的服务器 SSH 执行命令；不让用户自行从日志找命令，不默认由上传助手接着执行，密码按提示输入且不保存，已上传文件可复用
     temporary_directory: /tmp/home-server-ops/<任务标识>-<唯一后缀>/
     temporary_rules: 仅在需要落盘时由用户创建任务专属目录，限制为执行账号访问；一次性脚本、上传包和候选文件集中放置，home 不作为默认暂存位置
-    durable_files: 正式配置、长期维护脚本和必要回退资料放在约定的服务或持久路径；临时目录可能被清理，不能作为重要资料的唯一副本
+    durable_files: 正式配置和长期维护脚本放在约定的服务或持久路径；临时回退副本按deployment.rollback_and_cleanup退出，临时目录不能作为重要资料的唯一副本
     results: 用户返回必要的脱敏输出；本地 Codex 能直接只读复核的部分自行核验，验收后更新事实、任务和 Git，未执行的操作保持未完成
-    cleanup: 交付时说明本次临时文件清单与清理方式，验收后清理已确认无用的临时产物；失败时保留排查资料，回退资料按保留约定处理，不按通配符批删 home 或其他目录
+    cleanup: 交付时说明本次临时文件及回退副本的用途、路径、退出条件和清理方式；本次变更或阶段验收后给出精确清理命令并记录结果，额外保留明确理由和复核时间，不按通配符批删目录
 
   network:
     source: [network_handoff]
@@ -608,7 +611,7 @@ conventions:
       iptables_nft_api: https://manpages.debian.org/trixie/iptables/iptables-nft.8.en.html
 
   deployment:
-    source: [deployment_standard_review]
+    source: [deployment_standard_review, rollback_exit_decision]
     accepted: "2026-10-23"
     scope: 05.2 新服务部署规范与 README 模板；适用于后续部署和变更，不据此批量改造现有服务
     directories: 复用 directories 中 apps、persistent/data、persistent/secrets 和运行时盘的分工，不新增目录体系
@@ -650,8 +653,10 @@ conventions:
       - 文档与实际结果一致，未解释差异和未验证项明确；不因某层检查通过就断言整体成功
     rollback_and_cleanup:
       rollback: 分别记录配置回退、镜像回退与业务数据恢复；涉及数据库迁移先核对降级兼容性，不能保证仅换回旧镜像即可恢复
-      retention: 变更前保留必需的已知可用配置及镜像信息，记录恢复方法；数据恢复按一致性要求单独处理，不以普通配置副本代替
-      cleanup: 任务结束时检查候选文件、备份和临时产物的内容、引用及恢复价值；仅在授权范围清理已确认无用文件，不因文件名或目录位置批量删除
+      retention: 只为本次变更创建必需的已知可用回退版本，创建前定义用途、回退触发及退出条件，创建后记录准确路径和清理命令；默认本次变更或阶段验收通过后清理，不等待父任务或后续无关工作
+      retention_exception: 验证失败时用于回退，恢复且核验后清理；确需额外观察时说明理由、具体复核时间和到期处置，不接受只有“继续保留”的安排
+      cleanup: 达到退出条件即交付精确清理命令，用户执行后记录实际结果；未收到结果不标为已删除，不按扩展名或目录位置批删
+      data_backup_scope: 业务数据备份、原始恢复材料按各自的数据保全与保留策略处理，不套用临时配置副本的退出规则
       backup_boundary: README 分别记录备份生成、完整性检查和实际恢复验证状态；未建立时如实写明，05.3 负责后续备份与恢复建设
     documentation:
       server_readme: 后续新增服务或相关变更时，在 /srv/apps/<service>/README.md 使用下方模板；本轮未创建或修改服务器文件

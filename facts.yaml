@@ -39,6 +39,8 @@ sources:
   split_dns_handoff: {by: 用户转交任务11阶段记录并确认, date: "2026-10-25", scope: 软件安装、UFW、通配规则选择、台式机浏览器及代理修复、手机截图与反馈按用户记录；手机根因未知，Wi-Fi终端留待后续启动}
   split_dns_server_review: {by: 本地 Codex, checked_at: "2026-10-25T23:05:42+08:00", method: SSH只读检查包版本、正式文件、进程及53监听并查询IPv4和链路本地IPv6的TCP/UDP DNS, scope: 两类地址及协议的20项查询均通过，Caddyfile哈希未变；未查询sudo UFW、读取临时目录或修改配置，临时目录访问被拒绝}
   split_dns_desktop_review: {by: 本地 Codex, checked_at: "2026-10-25T23:05:51+08:00", ipv6_checked_at: "2026-10-25T23:08:44+08:00", method: Windows只读核对网卡DNS及当前用户代理，正常DNS解析并绕过代理执行可信HTTPS请求，另测链路本地IPv6 DNS普通及TCP查询, scope: 正常DNS返回LAN地址、HTTPS200及TLS校验0，当前代理和绕过条目存在；浏览器成功和原规则保留仍依据用户，不涉及手机测试}
+  split_dns_cleanup_handoff: {by: 用户, date: "2026-10-25", method: 返回精确删除两份回退副本及七个测试文件并rmdir成功的终端输出, scope: 本轮DNS临时目录清理结果依据用户；不推定其他任务目录也已清理}
+  split_dns_post_cleanup_review: {by: 本地 Codex, checked_at: "2026-10-25T23:27:19+08:00", method: Windows正常DNS解析及不使用--resolve的直连HTTPS复测, scope: 解析仍为192.168.1.110且HTTPS200及TLS校验0；未独立遍历已删除的受限临时目录，未修改服务}
 # 各节 source 对应上述来源；pending 为未验证项，intent 为用户设计。
 
 cloud_migration:
@@ -432,10 +434,12 @@ services:
     namespace_decision: 用户确认当前没有需独立保留解析的子域名，接受子域名通配，根域不在规则内
     namespace_limit: local规则将整个子域名空间作为本地区域处理，非A记录也不普通转发；未来邮件、TXT或独立解析需求须先设计例外
     temporary_cleanup:
+      source: [split_dns_cleanup_handoff, split_dns_post_cleanup_review]
       directory: /tmp/home-server-ops/task-11-dns-poc-20261025T1920/
-      rollback_files: [dnsmasq-defaults.before, dnsmasq-config.before-ipv6]
+      removed_rollback_files: [dnsmasq-defaults.before, dnsmasq-config.before-ipv6]
       exit_condition: 服务器配置及台式机阶段已通过，副本退出条件满足，不等待手机或笔记本任务
-      state: 最终清理未核实；本地审查账号无权列目录，未删除任何文件，精确清理结果待用户输出
+      state: 用户输出确认两份回退副本、七个候选配置及测试日志和任务目录已删除，本轮临时文件收尾完成
+      post_cleanup_result: 本地复测正常DNS仍返回内网地址且可信HTTPS200；服务器删除动作及目录清理依据用户输出
 
   ddns_go:
     source: [local, admin, user, ddns_review, ddns_logs, ddns_confirmation, deployment_review]

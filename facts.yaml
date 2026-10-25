@@ -34,6 +34,7 @@ sources:
   lan_4129_review: {by: 本地 Codex, checked_at: "2026-10-25T17:44:55+08:00", method: Windows curl 指定 LAN 地址直连域名4129并回归443及原LAN HTTP和DDNS入口, scope: 4129与443均HTTP200且证书校验通过，原LAN HTTP及DDNS登录页200；未修改DNS、登录应用或验证真实外网}
   rollback_exit_decision: {by: 用户要求、本地 Codex 整理, date: "2026-10-25", method: 为每次变更的临时回退副本定义退出和清理规则, scope: 默认本次变更或阶段验收后清理；不将父任务未完作为无限保留理由}
   caddy_backup_exit_review: {by: 本地 Codex, checked_at: "2026-10-25T17:51:09+08:00", method: SSH 只读检查本次副本元数据、正式配置哈希及配置引用, scope: 副本存在且未被Caddyfile或Compose引用，正式配置未变；未读取副本内容或删除文件，退出条件依据已完成的阶段验收}
+  caddy_rollback_cleanup_review: {by: 本地 Codex, checked_at: "2026-10-25T18:12:21+08:00", method: SSH只读对准确回退文件路径执行lstat并得到不存在结果, scope: 确认该副本当前不存在；未执行删除，不推定其他临时文件也已清理}
 # 各节 source 对应上述来源；pending 为未验证项，intent 为用户设计。
 
 cloud_migration:
@@ -311,7 +312,7 @@ services:
     https_port: 443
     caddyfile_sites: ["https://<TUDUDI_FQDN>", "https://<TUDUDI_FQDN>:4129", "http://<TUDUDI_FQDN>", "http://192.168.1.110"]
     ingress_review:
-      source: [caddy_applied_handoff, caddy_applied_review, ufw_4129_handoff, lan_4129_review, caddy_backup_exit_review]
+      source: [caddy_applied_handoff, caddy_applied_review, ufw_4129_handoff, lan_4129_review, caddy_backup_exit_review, caddy_rollback_cleanup_review]
       current_file_sha256: 4c912285f0c4b7b23bb7a0f06a2fb84fd7973e49cd442681627375dbbb5078ac
       current_http_listeners: [":80", ":443", "192.168.1.110:4129"]
       lan_4129_configured: true
@@ -323,8 +324,8 @@ services:
       deployment_reported:
         method: 用户运行脚本校验后原位更新，宿主机与容器文件哈希一致并热重载成功
         rollback_file: /srv/apps/caddy/Caddyfile.before-unified-20261025T093536511233Z
-        rollback_scope: 用户输出确认创建；本地只读确认文件存在且正式配置未引用，未读取内容
-        rollback_exit: Caddy及LAN4129阶段验收已通过，退出条件满足，待用户精确删除；不再作为后续Split DNS任务的回退前提
+        rollback_scope: 历史创建路径；本地18:12只读确认文件当前不存在，不再作为可用回退
+        rollback_exit: 本次阶段验收后退出条件已满足，副本清理结果已由本地确认；其他临时文件清理状态单独核实
     build:
       dockerfile: /srv/apps/caddy/Dockerfile
       base_images: ["caddy:2.11.4-builder-alpine", "caddy:2.11.4-alpine"]
@@ -462,9 +463,10 @@ network:
     user_reported_constraints: 家庭 LAN 使用该公网域名入口失败，路由器不能配置 NAT 回环或本地 DNS；约 5–6 台设备，包括两部手机及 3–4 台电脑
     acceptance_scope: 既有公网 HTTPS 验收不等于家庭 LAN 的同一域名及端口可用；当前 LAN HTTP 入口仍按 services.tududi 记录
     candidate: 服务器提供仅家庭 LAN 使用的 DNS，优先评估 dnsmasq，目标域名在家庭解析至 192.168.1.110；其余域名转发上游
+    dns_precheck: {source: [caddy_applied_review], checked_at: "2026-10-25T17:36:46+08:00", tcp_udp53_addresses: [127.0.0.53, 127.0.0.54], remaining: 监听归属、现有转发上游及最终DNS部署方式待最小核验}
     lan_https: Caddy 已新增192.168.1.110:4129并限制LAN来源；精确UFW放行后Windows直连返回可信HTTPS200，既有公网映射未改
     execution: Caddy配置与LAN TCP4129放行已完成并复测通过；尚未新增LAN DNS服务或调整设备DNS，完整统一URL任务未完成
-    details: 目标、Caddy 配置片段、实施范围、验收及回退统一见 progress.md 任务 11；DNS 部署方式、上游和设备配置方法待核对
+    details: 当前交接基线、DNS及设备接入剩余范围、验收和回退统一见progress.md任务11；已完成Caddy状态及扩容规则复用services.caddy与conventions.network.web_ingress
   interface: enp34s0
   ipv4: 192.168.1.110/24
   gateway: 192.168.1.1

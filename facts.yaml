@@ -36,6 +36,9 @@ sources:
   caddy_backup_exit_review: {by: 本地 Codex, checked_at: "2026-10-25T17:51:09+08:00", method: SSH 只读检查本次副本元数据、正式配置哈希及配置引用, scope: 副本存在且未被Caddyfile或Compose引用，正式配置未变；未读取副本内容或删除文件，退出条件依据已完成的阶段验收}
   caddy_rollback_cleanup_review: {by: 本地 Codex, checked_at: "2026-10-25T18:12:21+08:00", method: SSH只读对准确回退文件路径执行lstat并得到不存在结果, scope: 确认该副本当前不存在；未执行删除，不推定其他临时文件也已清理}
   hdd_transfer_handoff: {by: 用户转交05.3单文件迁移链路交接并确认, received: "2026-10-25", execution_time: 未提供精确时间, scope: 只读挂载、单文件传输及校验和播放、Windows目标及临时环境影响按用户报告；本地未独立读取文件、核对哈希或播放}
+  split_dns_handoff: {by: 用户转交任务11阶段记录并确认, date: "2026-10-25", scope: 软件安装、UFW、通配规则选择、台式机浏览器及代理修复、手机截图与反馈按用户记录；手机根因未知，Wi-Fi终端留待后续启动}
+  split_dns_server_review: {by: 本地 Codex, checked_at: "2026-10-25T23:05:42+08:00", method: SSH只读检查包版本、正式文件、进程及53监听并查询IPv4和链路本地IPv6的TCP/UDP DNS, scope: 两类地址及协议的20项查询均通过，Caddyfile哈希未变；未查询sudo UFW、读取临时目录或修改配置，临时目录访问被拒绝}
+  split_dns_desktop_review: {by: 本地 Codex, checked_at: "2026-10-25T23:05:51+08:00", ipv6_checked_at: "2026-10-25T23:08:44+08:00", method: Windows只读核对网卡DNS及当前用户代理，正常DNS解析并绕过代理执行可信HTTPS请求，另测链路本地IPv6 DNS普通及TCP查询, scope: 正常DNS返回LAN地址、HTTPS200及TLS校验0，当前代理和绕过条目存在；浏览器成功和原规则保留仍依据用户，不涉及手机测试}
 # 各节 source 对应上述来源；pending 为未验证项，intent 为用户设计。
 
 cloud_migration:
@@ -341,7 +344,7 @@ services:
       tls_and_protocols: AliDNS DNS-01 改为全局统一策略，显式 HTTP 跳转保留 4129，所有 HTTP 服务器使用 h1/h2；未见 443/4129 UDP 监听
       local_result: 服务器本机的 443 与 LAN 地址 4129 均为可信 TLS及 HTTP200，4129 对回环来源返回403；原 LAN HTTP 和 DDNS 路由及来源限制回归通过
       windows_lan_result: 用户添加精确 LAN TCP4129 放行后，本地 Windows 指定192.168.1.110访问域名4129返回HTTP200且证书校验通过；此前超时已消除，未借此声称Split DNS已生效
-      verification_limit: Caddy及本地Windows到LAN4129链路已通过；UFW依据用户输出，Split DNS、其他设备及真实外网端到端仍待验收，未登录应用
+      verification_limit: Caddy、Split DNS及固定台式机已分阶段验收；浏览器成功和手机移动数据访问由用户确认，Wi-Fi设备整体仍未验收，本地未登录应用
       deployment_reported:
         method: 用户运行脚本校验后原位更新，宿主机与容器文件哈希一致并热重载成功
         rollback_file: /srv/apps/caddy/Caddyfile.before-unified-20261025T093536511233Z
@@ -401,6 +404,38 @@ services:
       not_after: "2027-01-20T08:07:01Z"
       https_http_status: 200
       renewal: Caddy 自动管理；本轮验证配置及当前证书，不声称已跨续期周期观察
+
+  dnsmasq:
+    source: [split_dns_handoff, split_dns_server_review]
+    purpose: 家庭LAN子域名Split DNS，其他域名转发路由器DNS
+    deployment: Ubuntu软件包及systemd服务，非Docker容器
+    packages: {dnsmasq: 2.92-1ubuntu0.5, dnsmasq-base: 2.92-1ubuntu0.5, dns-root-data: 2025080400build1}
+    state: active/running
+    config: /etc/dnsmasq.d/home-server-split-dns.conf
+    defaults: {path: /etc/default/dnsmasq, DNSMASQ_OPTS: "--conf-file=/etc/dnsmasq.d/home-server-split-dns.conf"}
+    loading_scope: 当前进程包含上述conf-file及系统默认/etc/dnsmasq.d目录加载参数；后续改动仍需核对实际加载范围
+    listen: {protocols: [tcp, udp], port: 53, ipv4: 192.168.1.110, ipv6_link_local: "fe80::2ef0:5dff:fe62:8d3e%enp34s0", global_or_wildcard_observed: false}
+    config_redacted: |
+      port=53
+      listen-address=192.168.1.110
+      bind-interfaces
+      no-resolv
+      server=192.168.1.1
+      domain-needed
+      bogus-priv
+      local-ttl=60
+      address=/*.<DOMAIN>/192.168.1.110
+      local=/*.<DOMAIN>/
+      listen-address=fe80::2ef0:5dff:fe62:8d3e
+    coexistence: systemd-resolved保持active/running及127.0.0.53/127.0.0.54的TCP/UDP53；/etc/resolv.conf仍指向systemd stub文件
+    routing_verified: IPv4和链路本地IPv6的TCP/UDP查询均确认Tududi及future-web子域名A为192.168.1.110、Tududi AAAA无答案；根域及example.com继续获得公网结果，真实公网地址不公开
+    namespace_decision: 用户确认当前没有需独立保留解析的子域名，接受子域名通配，根域不在规则内
+    namespace_limit: local规则将整个子域名空间作为本地区域处理，非A记录也不普通转发；未来邮件、TXT或独立解析需求须先设计例外
+    temporary_cleanup:
+      directory: /tmp/home-server-ops/task-11-dns-poc-20261025T1920/
+      rollback_files: [dnsmasq-defaults.before, dnsmasq-config.before-ipv6]
+      exit_condition: 服务器配置及台式机阶段已通过，副本退出条件满足，不等待手机或笔记本任务
+      state: 最终清理未核实；本地审查账号无权列目录，未删除任何文件，精确清理结果待用户输出
 
   ddns_go:
     source: [local, admin, user, ddns_review, ddns_logs, ddns_confirmation, deployment_review]
@@ -477,32 +512,53 @@ network:
       user_confirmed: 真实外网访问、本轮实际使用、路由器唯一映射及旧映射清理、UFW 收尾、容器重建及两端配置校验一致
     future_standard_ports: 若以后标准端口可用，优先调整路由器及必要的跳转配置，保持服务器 443 与 Tududi 13002 不变
   unified_url_discussion:
-    source: [unified_url_handoff, caddy_ingress_design, caddy_applied_handoff, caddy_applied_review, ufw_4129_handoff, lan_4129_review]
+    source: [unified_url_handoff, caddy_ingress_design, caddy_applied_handoff, caddy_applied_review, ufw_4129_handoff, lan_4129_review, split_dns_handoff, split_dns_server_review, split_dns_desktop_review]
     status: Pending verification
     target_url: "https://tududi.<DOMAIN>:4129"
     reusable_goal: 后续获准 Web 服务沿用每服务子域名及内外网统一 4129 入口，Tududi 首项验收；扩容规则见 conventions.network.web_ingress
-    user_reported_constraints: 家庭 LAN 使用该公网域名入口失败，路由器不能配置 NAT 回环或本地 DNS；约 5–6 台设备，包括两部手机及 3–4 台电脑
-    acceptance_scope: 既有公网 HTTPS 验收不等于家庭 LAN 的同一域名及端口可用；当前 LAN HTTP 入口仍按 services.tududi 记录
-    candidate: 服务器提供仅家庭 LAN 使用的 DNS，优先评估 dnsmasq，目标域名在家庭解析至 192.168.1.110；其余域名转发上游
-    dns_precheck: {source: [caddy_applied_review], checked_at: "2026-10-25T17:36:46+08:00", tcp_udp53_addresses: [127.0.0.53, 127.0.0.54], remaining: 监听归属、现有转发上游及最终DNS部署方式待最小核验}
+    user_reported_constraints: 路由器不能NAT回环或本地DNS；固定台式机已验收，手机Wi-Fi仍失败，手机及笔记本后续由用户选择再启动
+    acceptance_scope: 服务器Split DNS及有线台式机同URL阶段已验收；Wi-Fi设备及切网行为尚未整体验收，原LAN HTTP入口保留
+    implementation: dnsmasq只监听家庭IPv4和IPv6链路本地地址，子域名通配A到192.168.1.110，根域及其他域名转发192.168.1.1；见services.dnsmasq
     lan_https: Caddy 已新增192.168.1.110:4129并限制LAN来源；精确UFW放行后Windows直连返回可信HTTPS200，既有公网映射未改
-    execution: Caddy配置与LAN TCP4129放行已完成并复测通过；尚未新增LAN DNS服务或调整设备DNS，完整统一URL任务未完成
-    details: 当前交接基线、DNS及设备接入剩余范围、验收和回退统一见progress.md任务11；已完成Caddy状态及扩容规则复用services.caddy与conventions.network.web_ingress
+    execution: Caddy、LAN4129、服务器DNS及固定有线台式机已完成；手机/笔记本接入留为未启动子任务，不因它们延长已验收阶段副本保留
+    details: Wi-Fi终端剩余任务、验收及清理见progress.md任务11；既有服务器与台式机事实按本文件复用
+  clients:
+    desktop:
+      source: [split_dns_handoff, split_dns_desktop_review]
+      network: 固定家庭有线台式机，用户确认基本不离家
+      ipv4: 192.168.1.120
+      interface_index: 8
+      dns: {ipv4: [192.168.1.110], ipv6: ["fe80::2ef0:5dff:fe62:8d3e"]}
+      proxy: {enabled: true, server: "127.0.0.1:5780", listener_process: airtcp.exe, mode_user_reported: 智能路由, added_ProxyOverride: "tududi.<DOMAIN>"}
+      proxy_change_scope: 用户确认保留原代理开关、服务器和其他绕过规则；绕过条目为当前用户持久设置，不区分家庭与外网，不直接照搬到移动笔记本
+      proxy_cause_user_reported: AirTCP使用远程DNS得到家庭公网地址，geoip-cn选择国内直连后受NAT回环限制影响；不是远程代理节点转发该请求
+      acceptance: 用户确认浏览器同URL已可访问且其他网站和代理正常；本地确认DNS配置、代理及精确绕过条目，未用--resolve的直连请求为内网可信HTTPS200
+    redmi_pilot:
+      source: [split_dns_handoff]
+      reported_settings: {ipv4_mode: static, ipv4: 192.168.1.121, gateway: 192.168.1.1, prefix_length: 24, dns1: 192.168.1.110, android_private_dns: off}
+      dns2: 截图初始为公共DNS，最终保存值未重新提供，未认定建议已执行
+      reported_result: 家庭Wi-Fi仍失败，移动数据可访问同一Tududi URL
+      root_cause: 未确定；不据此判定服务器DNS失败，也不默认归因于DNS2或IPv6
+      continuation: 用户要求留为后续子任务，未授权本轮继续排查或修改已验收的服务器及台式机配置
   interface: enp34s0
   ipv4: 192.168.1.110/24
   gateway: 192.168.1.1
   netplan: {file: /etc/netplan/00-installer-config.yaml, dhcp4: false, dhcp6: true}
   ipv6: {global_scope_address_observed: true, address: 不公开}
   ufw:
-    rules_source: [https_final_handoff, network_handoff, ufw_4129_handoff]
+    rules_source: [https_final_handoff, network_handoff, ufw_4129_handoff, split_dns_handoff]
     active: true
     default: {incoming: deny, outgoing: allow, routed: deny}
     default_last_verified: "2026-10-25"
     previous_report: {source: [network_handoff], default_unchanged_reported: true, ipv6_config_enabled: true, ipv6_user_allow_rules_shown: false, scope: 交接摘要报告 IPV6=yes、未显示对应 v6 用户放行规则；不等于 IPv6 无流量或公网安全已验证}
-    latest_report: {source: [ufw_4129_handoff], result: UFW active且默认策略不变，新增精确LAN TCP4129放行，原22/80/443保留, scope: 用户实际输出；本地未查询sudo规则或独立复核IPv6}
+    latest_report: {source: [split_dns_handoff], result: 用户确认新增IPv4及链路本地IPv6 TCP/UDP53规则，默认策略不变, scope: UFW规则依据用户输出；本地已验证台式机链路本地IPv6 DNS查询，但未完成IPv6公网边界审计}
     user_rules:
       - {from: 192.168.1.0/24, protocol: tcp, ports: [22, 80], action: allow}
       - {from: 192.168.1.0/24, to: 192.168.1.110, protocol: tcp, ports: [4129], action: allow, source: [ufw_4129_handoff]}
+      - {from: 192.168.1.0/24, to: 192.168.1.110, protocol: tcp, ports: [53], action: allow, source: [split_dns_handoff]}
+      - {from: "fe80::/10", to: "fe80::2ef0:5dff:fe62:8d3e", interface: enp34s0, protocol: tcp, ports: [53], action: allow, source: [split_dns_handoff]}
+      - {from: 192.168.1.0/24, to: 192.168.1.110, protocol: udp, ports: [53], action: allow, source: [split_dns_handoff]}
+      - {from: "fe80::/10", to: "fe80::2ef0:5dff:fe62:8d3e", interface: enp34s0, protocol: udp, ports: [53], action: allow, source: [split_dns_handoff]}
       - {from: 0.0.0.0/0, protocol: tcp, ports: [443], action: allow, scope: 用户确认保留公网 443、删除公网 80，IPv6 未独立复核}
     removed: 公网 TCP 80 放行规则，用户确认
   firewall_snapshot_reported:
@@ -516,11 +572,11 @@ network:
     ipv4_nat: 交接报告 127.0.0.1 的 13002、19876 分别转发至 Tududi、DDNS 容器端口
     scope: 用户执行的只读检查摘要；仅为部分链与 NAT 快照，不构成完整转发安全审查，默认 DROP 不证明所有访问路径安全
   listeners:
-    source: [local, https_final_review, caddy_applied_review]
-    non_loopback_tcp: [22, 80, 443, 4129]
-    loopback_tcp: [13002, 19876, 2019]
+    source: [local, https_final_review, caddy_applied_review, split_dns_server_review]
+    non_loopback_tcp: [22, 53, 80, 443, 4129]
+    loopback_tcp: [53, 13002, 19876, 2019]
     caddy_active_listen: [":80", ":443", "192.168.1.110:4129"]
-    scope: Caddy 监听按 2026-10-25 复核更新，其余端口沿用原来源，不作为完整实时监听清单
+    scope: Caddy及DNS监听按2026-10-25复核更新，其余端口沿用原来源，不作为完整实时监听清单
     tcp_443_observed: true
   pending:
     - 完整 Docker 转发链审查
@@ -571,7 +627,7 @@ conventions:
       public_checks: [DNS或DDNS, 路由器外部及内部端口, 监听地址, 对应协议族防火墙, Caddy站点及TLS与上游, 应用认证授权, IPv4与IPv6各自的暴露路径]
       internal_interfaces: 数据库、缓存及 Docker 管理接口等内部端口不直接公开；没有用途的公网端口保持关闭
     web_ingress:
-      source: [caddy_ingress_design]
+      source: [caddy_ingress_design, split_dns_handoff]
       date: "2026-10-25"
       scope: 后续 Web 服务的复用规则；实际实施范围及验证状态见 services.caddy 与 network.unified_url_discussion
       names: 每项服务使用明确子域名；同一服务内外网共用域名、HTTPS 和 4129 端口，以 Tududi 为首项验证
@@ -587,7 +643,7 @@ conventions:
       tls: AliDNS DNS-01 在全局 acme_dns 统一配置，凭据仍引用既有环境变量；同一域名不同端口共用证书，不重复定义冲突策略，不启用按需签发
       redirects: 保留自动证书管理，仅禁用自动 HTTP 跳转；需要的域名跳转显式指向 https://主机名:4129 并保留 URI，不开放公网 80
       protocols: 当前按 TCP 链路规划 h1/h2，不额外监听或映射 HTTP/3 的 UDP；以后确有需求再核对 UDP 转发及通告端口
-      dns: 仅维护获准服务主机名的内网解析，其他域名正常转发；不覆盖整个父域，核对 A/AAAA 与设备加密 DNS 的影响
+      dns: 当前用户接受子域名通配A并本地处理其其他记录类型，根域仍转发；新增独立记录需求先设计例外，实际规则见services.dnsmasq，DNS解析不等于自动创建Caddy站点
       expansion: 先确定访问级别、域名、上游及应用外部 URL；按需配置公网 DNS、LAN DNS 和证书权限，再校验、应用并回归既有入口，最后更新事实与进度
       change_control: 不修改全局 https_port；保留当前公网映射、LAN HTTP、DDNS 管理来源限制及证书数据目录；正式变更由用户执行
       file_loading: 单文件 bind 更新时核对宿主机、容器文件及有效路由，确认旧 inode 问题后才重建；以后拆分 include 文件需同步调整挂载，不能仅创建容器不可见的片段

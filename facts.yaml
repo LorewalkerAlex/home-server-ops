@@ -1,5 +1,5 @@
 # 已记录的服务器快照，不代表持续监测；conventions 为运行规范，不代表实施结果。均不是可直接部署的配置。
-updated: "2026-10-24"
+updated: "2026-10-25"
 sources:
   local: {by: 本地 Codex, date: "2026-10-21", method: SSH 只读核验}
   admin: {by: 用户, received: "2026-10-21—22", method: 管理员命令输出, execution_time: 未提供精确时间}
@@ -24,6 +24,7 @@ sources:
   cloud_export_acceptance: {by: 用户与本地 Codex 确认验收范围, date: "2026-10-23", decision: 接受私人电脑上的初始归档，取消 01-B 强制加密要求；01-A、01-B 完成，独立恢复与最终同步不冒充已完成}
   cloud_final_handoff: {by: 用户转交 Web 01-D 最终导出报告, date: "2026-10-24", scope: 云端导出、记录数量、数据库清单、源目录比较和资源保留按用户执行记录；未独立查询云端}
   cloud_final_local_review: {by: 本地 Codex, date: "2026-10-24", method: 只读核对 Windows 最终包大小、SHA-256、gzip 完整性、tar 结构及包内数据/项目清单，并与初始清单比较, scope: 未解压写盘、解读凭据内容、执行数据库恢复或检查云端实时状态}
+  unified_url_handoff: {by: 用户转交 Tududi 统一 URL 方案讨论及设备限制, date: "2026-10-25", scope: 内网访问失败与路由器能力依据用户测试及确认；Split DNS 仅为倾向方案，未核验实时配置或实施变更}
 # 各节 source 对应上述来源；pending 为未验证项，intent 为用户设计。
 
 cloud_migration:
@@ -429,6 +430,16 @@ network:
       local_verified: 可信证书、域名匹配、HTTPS 200、4129 跳转、LAN 根路径及 DDNS 管理限制、可读部署声明、无 .bak 文件
       user_confirmed: 真实外网访问、本轮实际使用、路由器唯一映射及旧映射清理、UFW 收尾、容器重建及两端配置校验一致
     future_standard_ports: 若以后标准端口可用，优先调整路由器及必要的跳转配置，保持服务器 443 与 Tududi 13002 不变
+  unified_url_discussion:
+    source: [unified_url_handoff]
+    status: Planned
+    target_url: "https://tududi.<DOMAIN>:4129"
+    user_reported_constraints: 家庭 LAN 使用该公网域名入口失败，路由器不能配置 NAT 回环或本地 DNS；约 5–6 台设备，包括两部手机及 3–4 台电脑
+    acceptance_scope: 既有公网 HTTPS 验收不等于家庭 LAN 的同一域名及端口可用；当前 LAN HTTP 入口仍按 services.tududi 记录
+    candidate: 服务器提供仅家庭 LAN 使用的 DNS，优先评估 dnsmasq，目标域名在家庭解析至 192.168.1.110；其余域名转发上游
+    planned_lan_https: 需新增 192.168.1.110:4129 的域名 HTTPS 入口；既有公网 TCP 4129 到服务器 443 的映射保持
+    execution: 仅方案讨论，未新增专项 DNS 服务、调整 Caddy/UFW 或修改设备 DNS，未将 53/4129 计入已验证监听
+    details: 目标、实施范围、验收及回退统一见 progress.md 任务 11；服务部署方式、上游和设备配置方法待核对
   interface: enp34s0
   ipv4: 192.168.1.110/24
   gateway: 192.168.1.1

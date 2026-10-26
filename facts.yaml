@@ -1,9 +1,31 @@
 # 已记录的服务器快照，不代表持续监测；conventions 为运行规范，不代表实施结果。均不是可直接部署的配置。
 updated: "2026-10-26"
 sources:
+  crawlab_delivery_review: {by: 本地 Codex, checked_at: "2026-10-26T22:29:17+08:00", method: 审阅本地初始化及设计材料、执行既有离线API检查和语法／YAML／链接检查，SSH只读核对正式文件哈希与相关TCP绑定, scope: 28个候选文件检查通过；基础Compose、正式覆盖及Caddy哈希与交接一致，13003仅回环、4129和19666绑定LAN；运行任务结果仍依据用户证据，未读取凭据、调用Docker或执行服务器变更}
+  crawlab_cleanup_ssh_review: {by: 本地 Codex, checked_at: "2026-10-26T22:09:04+08:00", method: 用户报告清理时SSH断开后以既有审查账号重新SSH登录并只读查询uptime／ssh服务／指定路径元数据, scope: SSH登录成功、ssh服务active、服务器运行近6天无本轮重启迹象；指定Caddy回退副本不存在，临时目录审查账号无权访问；不确定用户会话断开原因或其他清理结果}
+  crawlab_lan_smoke_result: {by: 用户, date: "2026-10-26", method: 返回内网新任务日志及Data截图, scope: 新代码标记可见、任务Finished、三条platform_smoke结果和序号1/2/3、run_marker显示部分一致；据此验收本轮更新同步／执行／原生回传，不是独立API全字段比对或业务入库验证}
+  crawlab_lan_smoke_execution: {by: 用户, date: "2026-10-26", method: 返回切换内网路径后的新任务日志, scope: 包含新增LAN_PATH_CHECK_20261026标记、Worker执行和三条SDK发送返回；尚未提供Finished状态及Data三条记录，不能据日志认定持久化完成}
+  crawlab_worker_override_applied: {by: 用户, date: "2026-10-26", method: 返回两条gRPC_UFW规则新增、覆盖文件创建、Compose静默校验及Master／Worker_Healthy、发布端口和容器探测结果, scope: 映射192.168.1.110:19666、DNS_TO_LAN_true、HTTPS200、gRPC_TCP_true；未提供Nodes状态或新路径原生任务结果}
+  crawlab_worker_override_review: {by: 本地 Codex, date: "2026-10-26", method: SSH只读核对覆盖文件内容／哈希、原Compose及Caddy哈希和19666监听, scope: 长期覆盖已存在且符合计划，原文件未变，监听仅192.168.1.110:19666；未读取凭据、Docker_API或执行任务}
+  crawlab_worker_firewall_result: {by: 用户, date: "2026-10-26", method: 返回三条UFW规则均Rule_added及Worker内按LAN_IP的HTTPS复测输出, scope: 新增172.20.0.0/16到192.168.1.110的UDP53／TCP53／TCP4129允许，容器HTTP_200_OK且默认TLS校验通过；DNS／filer／gRPC配置尚未切换}
+  crawlab_worker_network_inspection: {by: 用户, date: "2026-10-26", method: 返回sudo ufw status numbered及Worker的resolv.conf, scope: UFW active且8条现有规则仅家庭LAN／链路本地DNS来源，无172.20.0.0/16的53或4129规则；容器用127.0.0.11且ExtServers为host(127.0.0.53)、Overrides为空，尚未指定家庭DNS}
+  crawlab_worker_lan_probe: {by: 用户, date: "2026-10-26", method: 返回现有Worker内Python只读探测输出, scope: DNS_TO_LAN为false、按LAN_IP连接HTTPS时TimeoutError；未细分TCP／TLS等待，未确定根因，不代表既有Docker内部任务路径失败}
+  crawlab_dns_boundary_review: {by: 本地 Codex, checked_at: "2026-10-26T19:24:51+08:00", method: AliDNS DoH查询Crawlab主机名A和AAAA并对照本机普通A解析, scope: 公共解析器两类均NXDOMAIN无答案，内网A为192.168.1.110；单一解析器快照，非真实外网浏览器访问测试}
+  crawlab_lan_applied: {by: 用户, date: "2026-10-26", method: 返回enable-lan-web.py校验及APPLIED输出, scope: 只追加Crawlab LAN4129站点、Docker来源172.20.0.0/16、宿主与容器文件核对及Caddy热重载；未改DNS／UFW／Compose或Worker}
+  crawlab_lan_review: {by: 本地 Codex, date: "2026-10-26", method: SSH只读核对声明／哈希／上游／回退元数据及来源拒绝，Windows正常DNS直连HTTPS和真实用户代理注册表核对, scope: Crawlab200／TLS0／标题Crawlab、Tududi及原LAN／DDNS均200、回环来源403、通配代理绕过已存在；未登录应用或验证Worker新路径}
   airtcp_bypass_fix_review: {by: 本地 Codex, checked_at: "2026-10-26T15:43:47+08:00", method: 修复本地工具和使用说明，以Windows PowerShell隔离执行20项正常／拒绝写入检查，并复核安装DLL及原始备份哈希, scope: Patch／Verify／Restore闭环、旧清单兼容、缺失或损坏清单、错误哈希／来源／结构、多备份选择、目标已变化及未知版本拦截均通过；测试文件已清理，未还原或重打当前安装DLL、修改注册表或服务器}
   airtcp_bypass_confirmation: {by: 用户, date: "2026-10-26", method: 提供本地AirTCP绕过补丁工具并明确确认测试可用, scope: 本机使用结果；未逐项提供代理切换和客户端重启测试记录，不扩大为其他设备验收}
   airtcp_bypass_review: {by: 本地 Codex, checked_at: "2026-10-26T15:27:43+08:00", method: 静态审阅脚本和说明、隔离副本Patch／Verify／Restore及错误哈希清单测试、只读检查安装DLL和真实桌面用户代理、正常DNS及内网HTTPS, scope: 副本补丁与安装文件哈希一致、21项绕过表保留原20项、HTTPS200且TLS校验0；复现Restore跳过清单校验，未修改安装程序、注册表或服务器，未独立切换代理及重启客户端}
+  predefined_upload_path: {by: 用户, date: "2026-10-26", method: 要求助手可以预先定义上传位置, scope: 两步仍由用户执行；允许提前约定任务目录并同轮交付两段命令，无需为取得路径额外往返}
+  crawlab_lan_refresh_review: {by: 本地 Codex, date: "2026-10-26", method: 复读DNS交接后仅核对Crawlab普通A解析、当前用户精确代理绕过及SSH读取上游和Caddy配置摘要, scope: A为192.168.1.110、无Crawlab精确绕过项、Caddy文件与运行哈希仍匹配入口脚本、回环上游HTTP200；未应用入口或修改配置}
+  crawlab_api_result: {by: 用户, date: "2026-10-25", method: 在服务器交互运行read_results.py并返回检查摘要, scope: 已有smoke任务API读取PASS、finished、total3、分页2/1/0、sequence1/2/3及相同run_marker；不是本地独立API检查，不代表M05导入或SQLite事务验证}
+  crawlab_smoke_result: {by: 用户, date: "2026-10-25", method: 提供 platform_smoke 任务日志截图并表示结果无问题, scope: 截图显示 Finished、结果计数3、三条发送日志及结束日志，hostname与此前Worker容器一致；未独立读取Data原始字段或API，不代表M05／SQLite业务链路验证}
+  crawlab_master_disabled: {by: 用户, date: "2026-10-25", method: 明确确认已关闭并提供 Nodes 截图, scope: Master Online 且 Enabled 关闭，Worker Online 且 Enabled 开启，两节点 Runners 0/1；不代表任务、SDK、重启保持或密码修改验证}
+  crawlab_worker_online: {by: 用户, date: "2026-10-25", method: 返回 Worker 启动输出、docker ps 与 Nodes 页面截图, scope: 两节点 Online、Worker Enabled、两节点 Runners 0/1；Master Enabled 仍开启，不代表任务执行或 SDK 结果验证通过}
+  crawlab_home_ui: {by: 用户, date: "2026-10-25", method: 提供 Community v0.6.3 登录后首页截图, scope: 首页可访问、显示一个活动节点和空任务统计；不证明管理密码已改、Master 执行已关或 Worker 上线}
+  crawlab_master_started: {by: 用户, date: "2026-10-25", method: 返回 compose up --wait、compose ps 与回环 HTTP 检查输出, scope: 首次 MongoDB／Master 启动健康及 HTTP 200；尚未验证登录、Worker、持续运行或重启保持}
+  crawlab_prepared: {by: 用户, date: "2026-10-25", method: 返回 scp、prepare.sh 和 docker compose pull 成功输出, scope: 上传、目录及配置生成、Compose 校验与固定镜像拉取按用户输出确认；尚无启动、登录或节点结果}
+  crawlab_docker_inventory: {by: 用户, date: "2026-10-25", method: 提供 sudo docker compose version 与 docker ps -a 的输出, scope: 用户命令输出，不代表本地 Docker API 检查；未提供精确执行时间}
   local: {by: 本地 Codex, date: "2026-10-21", method: SSH 只读核验}
   admin: {by: 用户, received: "2026-10-21—22", method: 管理员命令输出, execution_time: 未提供精确时间}
   user: {by: 用户, date: "2026-10-22", method: 设计意图确认}
@@ -278,6 +300,12 @@ directories:
 
 docker:
   source: [local, admin, deployment_review]
+  crawlab_predeployment_inventory:
+    source: [crawlab_docker_inventory]
+    compose_version: v5.6.0
+    containers: [caddy, ddns-go, tududi]
+    reported_status: 三容器均运行；Tududi healthy；清单没有 Crawlab 容器
+    scope: 用户提供的当次名称、镜像标签及状态清单；不代表已检查容器实际镜像 digest、完整配置或已部署新服务
   client_version: 29.9.1
   compose_version: v5.6.0
   services_running: [docker, containerd]
@@ -305,6 +333,99 @@ docker:
     pending: [重新拉取镜像验证]
 
 services:
+  crawlab:
+    source: [crawlab_prepared, crawlab_master_started, crawlab_home_ui, crawlab_worker_online, crawlab_master_disabled, crawlab_smoke_result, crawlab_api_result, crawlab_lan_applied, crawlab_lan_review]
+    purpose: 爬虫平台体验部署，Master、专用 MongoDB 和一个 Worker
+    state: 基础部署、原生结果API及现有Worker内网新路径已阶段验收；Proxypool未实现，01-C和正式迁移未完成
+    delivery_acceptance:
+      source: [crawlab_delivery_review, crawlab_master_disabled, crawlab_api_result, crawlab_lan_smoke_result]
+      completed: 本地初始化和预研材料交付；Master／专用MongoDB／一个Worker基础部署，Master禁用执行、Worker一任务槽；smoke、结果API小规模分页及现有Worker内网新代码同步／执行／原生回传
+      business_status: M01—M08为已确认模块边界；Proxypool协议、有限SQLite存储及实施方案仍是草案，无业务实现；原生中转与直接业务回传为未选定候选，不同时构成权威写入路径
+      local_verification: 本地文件与离线检查、正式配置哈希和TCP绑定；不把用户任务日志／截图写成独立API核验
+      git_delivery: server-craw-cluster仅本地仓库，无首个提交或远程；Web不能从运维仓库读取其完整本地设计材料
+      boundary: 未验证异设备接入、长期性能、业务SQLite、恢复或重启保持；不复跑已通过smoke，不自动启动后续工作
+    compose: /srv/apps/crawlab/compose.yaml
+    compose_override:
+      source: [crawlab_worker_override_applied, crawlab_worker_override_review]
+      path: /srv/apps/crawlab/compose.override.yaml
+      sha256: 387e3b6e9a0fd668e1dc85264783d1672623cb567baca29302c31a1d6f0d5631
+      retention: 正式长期配置，成功后保留；基础配置未修改，不是临时回退副本
+    prepared_images:
+      master_worker: crawlabteam/crawlab:0.6.3@sha256:9dbe97240ba2670ce49fd1be5d557b59653e602d8fa29a71c9e05b26c557193b
+      mongo: mongo:7.0.45-jammy@sha256:6dad6a5e2addb71d84eb417fcbcba0e11d096669917f8e8c26607cd7b52f9495
+    data_directory: /srv/persistent/data/crawlab
+    secret_directory: /srv/persistent/secrets/crawlab
+    local_upstream: {url: "http://127.0.0.1:13003", observed_http_status: 200, source: [crawlab_master_started]}
+    published_port: {host_ip: 127.0.0.1, host: 13003, container: 8080, protocol: tcp, source: [crawlab_master_started]}
+    ui: {edition: Community, displayed_version: v0.6.3, active_nodes: 1, login_home_visible: true, source: [crawlab_home_ui]}
+    nodes_snapshot:
+      source: [crawlab_master_disabled]
+      master: {name: home-master, status: Online, enabled: false, running_tasks: 0, max_runners: 1}
+      worker: {name: home-worker-01, status: Online, enabled: true, running_tasks: 0, max_runners: 1}
+    smoke_check:
+      source: [crawlab_smoke_result]
+      task_status: Finished
+      platform_result_count: 3
+      logs: SMOKE_START、sequence 1／2／3 的 SMOKE_ITEM_SENT 和 SMOKE_SDK_CALLS_RETURNED 均可见
+      worker_match: 日志hostname与用户此前提供的crawlab-worker-1容器ID一致
+      boundary: 单次代码下发／执行／日志／原生SDK结果计数通过；未验证原始字段、API分页、幂等或SQLite事务
+    api_result_check:
+      source: [crawlab_api_result]
+      check: PASS
+      task_status: finished
+      total: 3
+      page_sizes: [2, 1, 0]
+      sequences: [1, 2, 3]
+      same_run_marker: true
+      boundary: 仅当前版本已有合成任务的小规模API读取与分页通过；未实现M05导入、重试幂等或SQLite业务事务
+    lan_entry_precheck:
+      historical_snapshot: true
+      source: [crawlab_lan_refresh_review]
+      hostname: crawlab.<DOMAIN>
+      normal_dns_a: 192.168.1.110
+      desktop_exact_proxy_bypass_present: false
+      caddy_file_and_active_hash_match_prepared_script: true
+      loopback_http_status: 200
+      boundary: 应用前快照；其后状态以lan_entry为准，不再依据旧精确绕过项缺失改当前代理
+    lan_entry:
+      source: [crawlab_lan_applied, crawlab_lan_review]
+      url: "https://crawlab.<DOMAIN>:4129"
+      access: LAN及本Crawlab专用Docker网络；未创建公网443站点
+      user_access_policy: 用户2026-10-26明确要求管理入口仅内网，公网不配置此主机名A/AAAA地址记录或管理页路由
+      public_dns: {source: [crawlab_dns_boundary_review], resolver: AliDNS_DoH, A: NXDOMAIN, AAAA: NXDOMAIN, answer_count: 0}
+      normal_dns_a: 192.168.1.110
+      direct_windows_http: 200
+      tls_verify_result: 0
+      html_title: Crawlab
+      allowed_source_networks: [192.168.1.0/24, 172.20.0.0/16]
+      denied_loopback_source_http: 403
+      desktop_subdomain_proxy_bypass_present: true
+      regressions: {tududi_https: 200, lan_http: 200, ddns_login: 200}
+      boundary: 本字段记录阶段一路由核验；后续用户内网任务页面使用及Worker新路径证据见worker_lan_precheck.native_smoke
+      temporary_cleanup:
+        rollback_file: /srv/apps/caddy/Caddyfile.before-crawlab-lan-20261026T100555584066Z
+        rollback_metadata: 1168字节、0600，本地只读核对；未读取副本正文
+        uploaded_script: /tmp/home-server-ops/crawlab-lan-web-20261026-01/enable-lan-web.py
+        task_directory: /tmp/home-server-ops/crawlab-lan-web-20261026-01
+        exit_condition: 本Caddy／TLS路由阶段通过时退出条件已满足；其后清理中SSH断开、指定副本已确认不存在，后续步骤撤回，遵循下方实际状态且不自动重跑删除
+        state: 用户执行所给清理命令后报告SSH断开，随后明确确认已重新连回；用户贴出的是可取得的全部末尾输出，不再要求补同一日志或重跑清理。指定回退副本已只读确认不存在，上传脚本及目录清理未确认，后续清理步骤撤回，具体断开机制未确定
+    worker_lan_precheck:
+      source: [crawlab_worker_lan_probe, crawlab_worker_firewall_result, crawlab_worker_override_applied]
+      dns_to_lan: true
+      dns_probe_stage: 覆盖文件应用并重建后，用户已验证普通DNS为LAN地址
+      https_by_lan_ip: HTTP_200_OK
+      container_default_tls_verified: true
+      current_network_source: [crawlab_worker_network_inspection]
+      resolver_before_override: {embedded: 127.0.0.11, upstream_reported: "host(127.0.0.53)", overrides: none}
+      explicit_dns_configured: 192.168.1.110
+      grpc_address: crawlab.<DOMAIN>:19666
+      filer_url: https://crawlab.<DOMAIN>:4129/api/filer
+      grpc_host_binding: 192.168.1.110:19666
+      grpc_tcp_reachable: true
+      current_status: 内网网络及新任务链路验收通过；用户日志确认新增代码标记，Data截图确认Finished及三条结果
+      native_smoke: {source: [crawlab_lan_smoke_result], task_status: Finished, result_count: 3, sequences: [1, 2, 3], code_marker_visible: true, run_marker_visible_consistent: true, boundary: 用户执行及截图证据，未独立API比对完整标记或验证业务入库}
+      worker_configuration_changed: true
+    pending: [管理密码修改状态确认, M05导入尚未实现或验证, 实际挂载及资源核验, 持续运行与重启保持]
   tududi:
     source: [local, admin, https_final_handoff, https_final_review]
     purpose: 任务管理
@@ -339,10 +460,12 @@ services:
     compose: /srv/apps/caddy/compose.yaml
     http_port: 80
     https_port: 443
-    caddyfile_sites: ["https://<TUDUDI_FQDN>", "https://<TUDUDI_FQDN>:4129", "http://<TUDUDI_FQDN>", "http://192.168.1.110"]
+    caddyfile_sites: ["https://<TUDUDI_FQDN>", "https://<TUDUDI_FQDN>:4129", "http://<TUDUDI_FQDN>", "http://192.168.1.110", "https://crawlab.<DOMAIN>:4129"]
     ingress_review:
       source: [caddy_applied_handoff, caddy_applied_review, ufw_4129_handoff, lan_4129_review, caddy_backup_exit_review, caddy_rollback_cleanup_review]
-      current_file_sha256: 4c912285f0c4b7b23bb7a0f06a2fb84fd7973e49cd442681627375dbbb5078ac
+      current_file_sha256: 40cd6be91391679516e626a8663b3a0c2011112805b4462fc34aff0239c24238
+      latest_change_source: [crawlab_lan_applied, crawlab_lan_review]
+      latest_change: 只追加Crawlab LAN4129站点；既有站点保持，Caddy及Crawlab的Compose哈希未变，原入口200回归通过
       current_http_listeners: [":80", ":443", "192.168.1.110:4129"]
       lan_4129_configured: true
       declaration: Compose 与审查基线相同；仍为 host 网络、自定义镜像、单文件只读 bind 及既有 env_file，未读取凭据
@@ -566,12 +689,12 @@ network:
   netplan: {file: /etc/netplan/00-installer-config.yaml, dhcp4: false, dhcp6: true}
   ipv6: {global_scope_address_observed: true, address: 不公开}
   ufw:
-    rules_source: [https_final_handoff, network_handoff, ufw_4129_handoff, split_dns_handoff]
+    rules_source: [https_final_handoff, network_handoff, ufw_4129_handoff, split_dns_handoff, crawlab_worker_firewall_result, crawlab_worker_override_applied]
     active: true
     default: {incoming: deny, outgoing: allow, routed: deny}
     default_last_verified: "2026-10-25"
     previous_report: {source: [network_handoff], default_unchanged_reported: true, ipv6_config_enabled: true, ipv6_user_allow_rules_shown: false, scope: 交接摘要报告 IPV6=yes、未显示对应 v6 用户放行规则；不等于 IPv6 无流量或公网安全已验证}
-    latest_report: {source: [split_dns_handoff], result: 用户确认新增IPv4及链路本地IPv6 TCP/UDP53规则，默认策略不变, scope: UFW规则依据用户输出；本地已验证台式机链路本地IPv6 DNS查询，但未完成IPv6公网边界审计}
+    latest_report: {source: [split_dns_handoff, crawlab_worker_firewall_result, crawlab_worker_override_applied], result: 用户已追加Docker到宿主DNS／HTTPS及LAN和Docker到宿主19666规则，Worker重建后DNS／HTTPS／gRPC_TCP均通过, scope: 新规则及容器测试依据用户输出；仅LAN端口绑定另有本地只读确认，不扩大为完整转发隔离或IPv6公网审计}
     user_rules:
       - {from: 192.168.1.0/24, protocol: tcp, ports: [22, 80], action: allow}
       - {from: 192.168.1.0/24, to: 192.168.1.110, protocol: tcp, ports: [4129], action: allow, source: [ufw_4129_handoff]}
@@ -580,6 +703,10 @@ network:
       - {from: 192.168.1.0/24, to: 192.168.1.110, protocol: udp, ports: [53], action: allow, source: [split_dns_handoff]}
       - {from: "fe80::/10", to: "fe80::2ef0:5dff:fe62:8d3e", interface: enp34s0, protocol: udp, ports: [53], action: allow, source: [split_dns_handoff]}
       - {from: 0.0.0.0/0, protocol: tcp, ports: [443], action: allow, scope: 用户确认保留公网 443、删除公网 80，IPv6 未独立复核}
+      - {from: 172.20.0.0/16, to: 192.168.1.110, protocol: udp, ports: [53], action: allow, source: [crawlab_worker_firewall_result]}
+      - {from: 172.20.0.0/16, to: 192.168.1.110, protocol: tcp, ports: [53, 4129], action: allow, source: [crawlab_worker_firewall_result]}
+      - {from: 192.168.1.0/24, to: 192.168.1.110, protocol: tcp, ports: [19666], action: allow, source: [crawlab_worker_override_applied]}
+      - {from: 172.20.0.0/16, to: 192.168.1.110, protocol: tcp, ports: [19666], action: allow, source: [crawlab_worker_override_applied]}
     removed: 公网 TCP 80 放行规则，用户确认
   firewall_snapshot_reported:
     source: [network_handoff]
@@ -610,14 +737,14 @@ operations:
 
 conventions:
   server_interaction:
-    source: [interaction_agreement, rollback_exit_decision]
+    source: [interaction_agreement, rollback_exit_decision, predefined_upload_path]
     scope: 本地 Codex 与 Web 指导服务器操作时共用；不改变既有权限和用户执行变更的分工
     inspection: 本地 Codex 优先通过已有只读访问完成任务相关检查；需要管理员权限的最小检查由用户执行，不要求重跑已有有效证据
     default_delivery: 简单操作直接给可复制命令，用户在已有 SSH 会话执行；不为几条命令默认生成、上传独立脚本
     command_format: 标明执行位置、所需权限、作用及预期结果；按可验证的小步提供，遇到失败先分析，不让用户继续执行依赖失败步骤的命令
     inline_code: 少量多行逻辑可使用带引号分隔符的 heredoc；较长逻辑应保持可审查，不把复杂部署隐藏在单条命令或编码内容中
     script_use: 复杂或需重复执行的操作可以交付脚本或配置包，同时说明内容、运行命令、验证、回退及文件去向；不要求用户为每个步骤另存脚本
-    upload_method: 分两步交付，先给本地 PowerShell 上传命令，收到上传结果后单独给可复制的服务器 SSH 执行命令；不让用户自行从日志找命令，不默认由上传助手接着执行，密码按提示输入且不保存，已上传文件可复用
+    upload_method: 分两步执行；可预先约定唯一任务目录并同轮分别给本地PowerShell上传和完整服务器SSH命令，看到Upload verified后才执行服务器命令，不必仅为取得路径回传一次；不让用户从日志找命令，不默认自动执行，密码按提示输入且不保存，已上传文件可复用
     temporary_directory: /tmp/home-server-ops/<任务标识>-<唯一后缀>/
     temporary_rules: 仅在需要落盘时由用户创建任务专属目录，限制为执行账号访问；一次性脚本、上传包和候选文件集中放置，home 不作为默认暂存位置
     durable_files: 正式配置和长期维护脚本放在约定的服务或持久路径；临时回退副本按deployment.rollback_and_cleanup退出，临时目录不能作为重要资料的唯一副本

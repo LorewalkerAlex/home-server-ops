@@ -1,6 +1,8 @@
 # 已记录的服务器快照，不代表持续监测；conventions 为运行规范，不代表实施结果。均不是可直接部署的配置。
-updated: "2026-10-26"
+updated: "2026-10-27"
 sources:
+  information_integrity_policy: {by: 用户要求、本地Codex落实, date: "2026-10-27", scope: 将配置注释／服务说明／操作指引的认知一致性纳入交付和验收，增加本地只读文字初筛及回归样例；规范已更新，不表示现有服务器文字已全部整改}
+  caddy_annotation_review: {by: 本地 Codex, checked_at: "2026-10-27T00:16:02+08:00", method: SSH只读核对正式Caddyfile首行及哈希, scope: 第1行仍称Candidate_only且not_loaded，文件SHA仍为9154cee5…；与已验收加载状态矛盾，未修改服务器，文字纠正仍待执行}
   beszel_handoff: {by: 用户转交Web部署结果及确认, date: "2026-10-26", scope: Hub运行且healthy、Agent运行及重启0、WebSocket已连接、浏览器登录及主机／Docker指标可见；agent.env的0600_root:root及KEY／新TOKEN与对应值一致由用户确认，未由本地读取秘密或Docker_API核验}
   beszel_review: {by: 本地 Codex, checked_at: "2026-10-26T23:20:03+08:00", route_checked_at: "2026-10-26T23:22:46+08:00", method: SSH只读核对正式Compose和非秘密参数、持久目录元数据、Caddy文件及有效HTTP路由、回环HTTP和来源拒绝，并从Windows使用正常DNS直连HTTPS, scope: 声明及路径符合交接、8090仅回环、Beszel_200／TLS0且远端为LAN、非LAN回环来源403，Tududi／Crawlab内网HTTPS回归200；未登录应用、读取agent.env、Docker_API或临时目录}
   beszel_cleanup_result: {by: 用户, date: "2026-10-26", method: 返回两个精确任务目录的sudo删除成功输出, scope: 两个目录均显示Removed，按用户执行结果确认清理，不描述成本地删除或独立遍历核验}
@@ -509,6 +511,13 @@ services:
     ingress_review:
       source: [caddy_applied_handoff, caddy_applied_review, ufw_4129_handoff, lan_4129_review, caddy_backup_exit_review, caddy_rollback_cleanup_review]
       current_file_sha256: 9154cee5b590fff138db93997132a325d6e199b1d599b086fb762246d3ff506d
+      annotation_issue:
+        source: [caddy_annotation_review]
+        status: Pending correction
+        location: /srv/apps/caddy/Caddyfile，第1行
+        finding: 正式文件仍声明Candidate_only及not_loaded，与已完成加载及入口验收矛盾；此前验收遗漏了文字一致性检查
+        correction: 将首行改为稳定用途说明或移除，原位保留其余字节；用户执行后回读并更新文件哈希，不能以本轮规范更新代替服务器纠正
+        scope: 服务入口已有的技术验收保留，配置文字收尾未通过；不重跑旧部署脚本或以修改注释为由重写完整配置
       latest_change_source: [beszel_handoff, beszel_review]
       latest_change: 新增Beszel_LAN4129站点，复用lan_only并反代回环8090；有效配置保留Tududi／Crawlab／内网IP站点，Windows原Tududi／Crawlab内网可信HTTPS200回归通过；未逐字节比较全部旧配置
       current_http_listeners: [":80", ":443", "192.168.1.110:4129"]
@@ -882,7 +891,7 @@ conventions:
       iptables_nft_api: https://manpages.debian.org/trixie/iptables/iptables-nft.8.en.html
 
   deployment:
-    source: [deployment_standard_review, rollback_exit_decision]
+    source: [deployment_standard_review, rollback_exit_decision, information_integrity_policy]
     accepted: "2026-10-23"
     scope: 05.2 新服务部署规范与 README 模板；适用于后续部署和变更，不据此批量改造现有服务
     directories: 复用 directories 中 apps、persistent/data、persistent/secrets 和运行时盘的分工，不新增目录体系
@@ -910,6 +919,14 @@ conventions:
       deployed_check: 按变更范围提取实际镜像、网络、端口和挂载等必要字段；检查单文件 bind 时可比对两端哈希，避免输出完整 inspect 或环境变量
       effective_check: 服务支持时检查已加载配置的必要字段，并验证实际响应；不支持运行配置查询时注明限制，使用业务行为验证，不强行要求统一接口
       sensitive_output: 普通 compose config 会展开变量，Caddy 管理 API 和日志也可能包含秘密；仅保留必要的脱敏结果
+    information_integrity:
+      artifact_boundary: 准备时明确模板、正式交付内容和历史证据各自用途；脚本生成配置时检查实际将写入的最终内容，不能只检查脚本说明或源模板。历史证据保留原样并标明历史，不靠全局替换消除真实的未完成记录
+      stable_comments: 正式配置只保留稳定用途、结构和必要约束说明；候选／未加载／已部署等阶段状态放在带来源与核验时间的事实或任务记录，不能由文件位置、脚本变量名或注释推定运行状态
+      before_apply: 交付前同时审查有效配置、注释和邻近操作说明，查找模板标记、未替换占位符、旧入口／目录、过期状态及失效回退路径；发现矛盾先纠正或明确适用范围，不随候选文件一并带入正式路径
+      after_apply: 按本次变更范围回读正式文件的相关说明，结合加载结果／响应核对，再同步当前事实、进度和受影响服务文档；用户未执行的文档修正保持待纠正，不把写好候选或Git提交当服务器已改
+      acceptance: 技术行为与文字一致性分别记录；语法通过、哈希相同或服务可用不能替代说明正确。未解释的认知矛盾存在时，不宣布本次文字收尾或整个交付全部通过；已完成的技术阶段无需因此重做
+      screening: 使用只读关键字初筛辅助发现正式配置中的阶段断言和模板残留，报告位置而不回显完整内容或凭据；初筛通过不等于语义验收，Web按相同检查项审阅，无需读取本机私有工具
+      scope: 覆盖本次新增／修改及已明确发现的问题，不要求每次全盘重查；真实未知、历史快照和可复用模板可保留准确标识，不机械删除候选或待验证字样
     apply_changes:
       approval: 服务器变更仍由用户授权；执行前确认现行配置、影响及可用回退资料，失败先分析
       restart: compose restart 只重启现有容器，不用于应用 Compose 或环境变量变更
@@ -921,7 +938,7 @@ conventions:
     acceptance:
       - 按范围核对声明、实际镜像及挂载、已加载配置或替代验证，并记录主体、时间与结果
       - 验证健康或业务响应及所需访问路径；涉及公网或管理限制时复用网络规范的验证要求
-      - 文档与实际结果一致，未解释差异和未验证项明确；不因某层检查通过就断言整体成功
+      - 回读正式配置的相关注释和受影响服务说明，与实际结果、当前事实和任务状态一致；未解释差异和未验证项明确，文字收尾与技术结果分别验收
     rollback_and_cleanup:
       rollback: 分别记录配置回退、镜像回退与业务数据恢复；涉及数据库迁移先核对降级兼容性，不能保证仅换回旧镜像即可恢复
       retention: 只为本次变更创建必需的已知可用回退版本，创建前定义用途、回退触发及退出条件，创建后记录准确路径和清理命令；默认本次变更或阶段验收通过后清理，不等待父任务或后续无关工作

@@ -1,6 +1,8 @@
 # 已记录的服务器快照，不代表持续监测；conventions 为运行规范，不代表实施结果。均不是可直接部署的配置。
-updated: "2026-10-25"
+updated: "2026-10-26"
 sources:
+  airtcp_bypass_confirmation: {by: 用户, date: "2026-10-26", method: 提供本地AirTCP绕过补丁工具并明确确认测试可用, scope: 本机使用结果；未逐项提供代理切换和客户端重启测试记录，不扩大为其他设备验收}
+  airtcp_bypass_review: {by: 本地 Codex, checked_at: "2026-10-26T15:27:43+08:00", method: 静态审阅脚本和说明、隔离副本Patch／Verify／Restore及错误哈希清单测试、只读检查安装DLL和真实桌面用户代理、正常DNS及内网HTTPS, scope: 副本补丁与安装文件哈希一致、21项绕过表保留原20项、HTTPS200且TLS校验0；复现Restore跳过清单校验，未修改安装程序、注册表或服务器，未独立切换代理及重启客户端}
   local: {by: 本地 Codex, date: "2026-10-21", method: SSH 只读核验}
   admin: {by: 用户, received: "2026-10-21—22", method: 管理员命令输出, execution_time: 未提供精确时间}
   user: {by: 用户, date: "2026-10-22", method: 设计意图确认}
@@ -528,15 +530,27 @@ network:
     details: Wi-Fi终端剩余任务、验收及清理见progress.md任务11；既有服务器与台式机事实按本文件复用
   clients:
     desktop:
-      source: [split_dns_handoff, split_dns_desktop_review]
+      source: [split_dns_handoff, split_dns_desktop_review, airtcp_bypass_confirmation, airtcp_bypass_review]
       network: 固定家庭有线台式机，用户确认基本不离家
       ipv4: 192.168.1.120
       interface_index: 8
       dns: {ipv4: [192.168.1.110], ipv6: ["fe80::2ef0:5dff:fe62:8d3e"]}
-      proxy: {enabled: true, server: "127.0.0.1:5780", listener_process: airtcp.exe, mode_user_reported: 智能路由, added_ProxyOverride: "tududi.<DOMAIN>"}
-      proxy_change_scope: 用户确认保留原代理开关、服务器和其他绕过规则；绕过条目为当前用户持久设置，不区分家庭与外网，不直接照搬到移动笔记本
+      proxy: {enabled: true, server: "127.0.0.1:5780", listener_process: airtcp.exe, mode_user_reported: 智能路由, added_ProxyOverride: "*.<DOMAIN>"}
+      proxy_change_scope: 2026-10-26由手动添加Tududi精确项改为客户端DLL补丁生成子域名通配项，保留原20条绕过项及系统代理；覆盖全部子域但不含根域，不区分网络，不直接照搬到移动笔记本
       proxy_cause_user_reported: AirTCP使用远程DNS得到家庭公网地址，geoip-cn选择国内直连后受NAT回环限制影响；不是远程代理节点转发该请求
-      acceptance: 用户确认浏览器同URL已可访问且其他网站和代理正常；本地确认DNS配置、代理及精确绕过条目，未用--resolve的直连请求为内网可信HTTPS200
+      airtcp_bypass_patch:
+        source: [airtcp_bypass_confirmation, airtcp_bypass_review]
+        acceptance: 当前固定台式机使用阶段通过；不将工具的自动回退和跨版本兼容性认定为已通过
+        version: "1.0.39+31"
+        mechanism: 修改本机air_service_plugin.dll，保留原列表并新增只读.bypass节、重定向唯一代码引用；目的为避免客户端重新开启系统代理时覆盖手动绕过项
+        original_sha256: A381728EFEB60837651C422A3E55E643D6CB4754486BBAF7CCEDCE9BAD615AFE
+        patched_sha256: 6960D6F94A62B070FE67572BB9C9F3DA3380F95EE9E0A028D03E4F86BD6FEBD9
+        patched_bytes: 220672
+        scope: 仅使用Windows系统代理绕过设置的应用；不保证自带代理／DNS或TUN应用遵循，未来子域名需同时具有DNS和获准Caddy路由，通配项本身不开放服务
+        rollback_limit: Restore将.dll.bak误映射为.dll.json，但实际清单是.json，导致哈希校验被跳过；当前还原前必须独立比对原始哈希及版本，不依赖自动选择最新备份，防止覆盖升级后的DLL
+        maintenance_limit: 仅验收上述固定版本及哈希；升级可能替换补丁，须重新核验版本、PE结构、签名及实际代理行为，不照说明直接跨版本重打
+        rollback_material: 本机现有原始DLL及清单为当前二进制修改的回退资料，未删除；用途在恢复原版并验证或升级替换补丁后结束，届时核对无依赖再精确清理。复核日期2026-11-02或升级／还原时，以先到者为准；不自动累积新副本
+      acceptance: 用户确认本机方案测试可用；本地确认安装补丁、实际启用的代理及子域名通配绕过，正常DNS到192.168.1.110且未用--resolve的直连HTTPS200／TLS校验0；代理切换及重启后的保持性未由本地独立操作验证
     redmi_pilot:
       source: [split_dns_handoff]
       reported_settings: {ipv4_mode: static, ipv4: 192.168.1.121, gateway: 192.168.1.1, prefix_length: 24, dns1: 192.168.1.110, android_private_dns: off}

@@ -1,6 +1,7 @@
 # 已记录的服务器快照，不代表持续监测；conventions 为运行规范，不代表实施结果。均不是可直接部署的配置。
 updated: "2026-10-27"
 sources:
+  caddy_annotation_correction: {by: 用户执行、本地Codex独立复核, checked_at: "2026-10-27T00:25:03+08:00", method: 用户返回原位更正成功及新哈希，本地SSH只读核对首行和全文件SHA并将原首行拼回后与旧哈希比对, scope: 新首行为稳定用途说明、哈希与用户一致、旧错误注释已不存在且其余字节与修改前完全相同；未由本地写入或重载服务器}
   information_integrity_policy: {by: 用户要求、本地Codex落实, date: "2026-10-27", scope: 将配置注释／服务说明／操作指引的认知一致性纳入交付和验收，增加本地只读文字初筛及回归样例；规范已更新，不表示现有服务器文字已全部整改}
   caddy_annotation_review: {by: 本地 Codex, checked_at: "2026-10-27T00:16:02+08:00", method: SSH只读核对正式Caddyfile首行及哈希, scope: 第1行仍称Candidate_only且not_loaded，文件SHA仍为9154cee5…；与已验收加载状态矛盾，未修改服务器，文字纠正仍待执行}
   beszel_handoff: {by: 用户转交Web部署结果及确认, date: "2026-10-26", scope: Hub运行且healthy、Agent运行及重启0、WebSocket已连接、浏览器登录及主机／Docker指标可见；agent.env的0600_root:root及KEY／新TOKEN与对应值一致由用户确认，未由本地读取秘密或Docker_API核验}
@@ -510,16 +511,16 @@ services:
     caddyfile_sites: ["https://<TUDUDI_FQDN>", "https://<TUDUDI_FQDN>:4129", "http://<TUDUDI_FQDN>", "http://192.168.1.110", "https://crawlab.<DOMAIN>:4129", "https://beszel.<DOMAIN>:4129"]
     ingress_review:
       source: [caddy_applied_handoff, caddy_applied_review, ufw_4129_handoff, lan_4129_review, caddy_backup_exit_review, caddy_rollback_cleanup_review]
-      current_file_sha256: 9154cee5b590fff138db93997132a325d6e199b1d599b086fb762246d3ff506d
+      current_file_sha256: 22348d09d2da6b914676a4601b203073acfb7f9b7e73435da937c4baa14bad40
       annotation_issue:
-        source: [caddy_annotation_review]
-        status: Pending correction
+        source: [caddy_annotation_review, caddy_annotation_correction]
+        status: Corrected
         location: /srv/apps/caddy/Caddyfile，第1行
-        finding: 正式文件仍声明Candidate_only及not_loaded，与已完成加载及入口验收矛盾；此前验收遗漏了文字一致性检查
-        correction: 将首行改为稳定用途说明或移除，原位保留其余字节；用户执行后回读并更新文件哈希，不能以本轮规范更新代替服务器纠正
-        scope: 服务入口已有的技术验收保留，配置文字收尾未通过；不重跑旧部署脚本或以修改注释为由重写完整配置
-      latest_change_source: [beszel_handoff, beszel_review]
-      latest_change: 新增Beszel_LAN4129站点，复用lan_only并反代回环8090；有效配置保留Tududi／Crawlab／内网IP站点，Windows原Tududi／Crawlab内网可信HTTPS200回归通过；未逐字节比较全部旧配置
+        finding: 00:16确认正式首行误称候选未加载，与已验收状态矛盾；此前验收遗漏文字一致性检查，该问题已于本次纠正
+        correction: 用户已原位改为稳定用途说明，本地回读确认为Home_Server_Caddy_configuration；新哈希与用户一致，替回旧首行可还原旧哈希，证明其余字节未变
+        scope: 本次已知注释的文字收尾通过，既有技术验收保留；未重跑旧部署或重写其他内容，不据此宣称所有服务器说明均已审查
+      latest_change_source: [caddy_annotation_correction]
+      latest_change: 用户仅纠正首行误导性状态注释，00:25本地确认其余字节完全未变；Beszel／Tududi／Crawlab及内网IP的既有路由和验收记录保留
       current_http_listeners: [":80", ":443", "192.168.1.110:4129"]
       lan_4129_configured: true
       declaration: Compose 与审查基线相同；仍为 host 网络、自定义镜像、单文件只读 bind 及既有 env_file，未读取凭据

@@ -1,6 +1,9 @@
 # 已记录的服务器快照，不代表持续监测；conventions 为运行规范，不代表实施结果。均不是可直接部署的配置。
 updated: "2026-10-26"
 sources:
+  beszel_handoff: {by: 用户转交Web部署结果及确认, date: "2026-10-26", scope: Hub运行且healthy、Agent运行及重启0、WebSocket已连接、浏览器登录及主机／Docker指标可见；agent.env的0600_root:root及KEY／新TOKEN与对应值一致由用户确认，未由本地读取秘密或Docker_API核验}
+  beszel_review: {by: 本地 Codex, checked_at: "2026-10-26T23:20:03+08:00", route_checked_at: "2026-10-26T23:22:46+08:00", method: SSH只读核对正式Compose和非秘密参数、持久目录元数据、Caddy文件及有效HTTP路由、回环HTTP和来源拒绝，并从Windows使用正常DNS直连HTTPS, scope: 声明及路径符合交接、8090仅回环、Beszel_200／TLS0且远端为LAN、非LAN回环来源403，Tududi／Crawlab内网HTTPS回归200；未登录应用、读取agent.env、Docker_API或临时目录}
+  beszel_cleanup_result: {by: 用户, date: "2026-10-26", method: 返回两个精确任务目录的sudo删除成功输出, scope: 两个目录均显示Removed，按用户执行结果确认清理，不描述成本地删除或独立遍历核验}
   crawlab_delivery_review: {by: 本地 Codex, checked_at: "2026-10-26T22:29:17+08:00", method: 审阅本地初始化及设计材料、执行既有离线API检查和语法／YAML／链接检查，SSH只读核对正式文件哈希与相关TCP绑定, scope: 28个候选文件检查通过；基础Compose、正式覆盖及Caddy哈希与交接一致，13003仅回环、4129和19666绑定LAN；运行任务结果仍依据用户证据，未读取凭据、调用Docker或执行服务器变更}
   crawlab_cleanup_ssh_review: {by: 本地 Codex, checked_at: "2026-10-26T22:09:04+08:00", method: 用户报告清理时SSH断开后以既有审查账号重新SSH登录并只读查询uptime／ssh服务／指定路径元数据, scope: SSH登录成功、ssh服务active、服务器运行近6天无本轮重启迹象；指定Caddy回退副本不存在，临时目录审查账号无权访问；不确定用户会话断开原因或其他清理结果}
   crawlab_lan_smoke_result: {by: 用户, date: "2026-10-26", method: 返回内网新任务日志及Data截图, scope: 新代码标记可见、任务Finished、三条platform_smoke结果和序号1/2/3、run_marker显示部分一致；据此验收本轮更新同步／执行／原生回传，不是独立API全字段比对或业务入库验证}
@@ -333,6 +336,48 @@ docker:
     pending: [重新拉取镜像验证]
 
 services:
+  beszel:
+    source: [beszel_handoff, beszel_review]
+    purpose: 当前home-server的主机及Docker资源监控，任务04的已完成阶段
+    compose: /srv/apps/beszel/compose.yaml
+    compose_sha256: 36623d0675c01ba694c5331ee18446188fa1dc034a2f3f39ca9ac3f3a1eb9913
+    image_scope: 本地已核对正式声明，运行状态和镜像使用按用户交接；未独立读取Docker_API
+    hub:
+      image: henrygd/beszel:0.21.1
+      container: beszel
+      state_user_reported: running且healthy
+      restart: unless-stopped
+      port: {host_ip: 127.0.0.1, host: 8090, container: 8090, protocol: tcp}
+      data: {host: /srv/persistent/data/beszel/hub, container: /beszel_data, directory_locally_verified: true}
+      healthcheck_declared: /beszel health --url http://localhost:8090
+      loopback_http_status: 200
+    agent:
+      image: henrygd/beszel-agent:0.21.1
+      container: beszel-agent
+      state_user_reported: running，重启次数0
+      restart: unless-stopped
+      network: host
+      data: {host: /srv/persistent/data/beszel/agent, container: /var/lib/beszel-agent, directory_locally_verified: true}
+      env_file: /srv/persistent/secrets/beszel/agent.env
+      credentials: {source: [beszel_handoff], permission_user_confirmed: "0600 root:root", matching: 用户人工确认KEY及新TOKEN分别与Hub提供的对应值一致, independent_scope: 本地只核对文件引用，父目录权限限制未读取内容或复核其元数据}
+      docker_socket: {host: /var/run/docker.sock, container: /var/run/docker.sock, bind_read_only: true}
+      healthcheck: 未配置；用户看到Health_None，不据此判定故障
+      listen: /beszel_socket/beszel.sock
+      hub_url: http://localhost:8090
+    connection:
+      compose_volume: beszel_socket
+      runtime_volume_user_reported: beszel_beszel_socket
+      mount_in_both_containers: /beszel_socket
+      unix_socket_role: Agent监听Unix_Socket供Hub访问；共享卷声明已核对，具体Hub连接选择未读取其数据库
+      websocket_user_reported: Agent日志WebSocket_connected_host=localhost:8090，与HUB_URL回环配置一致
+      reference: https://beszel.dev/guide/agent-installation#connecting-to-a-local-agent
+    entry: {url: "https://beszel.<DOMAIN>:4129", bind: "192.168.1.110:4129", caddy_guard: lan_only, allowed_source: 192.168.1.0/24, upstream: "127.0.0.1:8090", normal_dns_a: 192.168.1.110, windows_https_status: 200, tls_verify_result: 0, denied_loopback_source_http: 403}
+    acceptance: Beszel_Hub／Agent及内网HTTPS阶段通过；用户确认已登录、home-server在线并可查看CPU／内存／磁盘及Docker资源；本地独立验证声明、有效路由、普通DNS／可信HTTPS及既有入口回归
+    temporary_cleanup:
+      source: [beszel_cleanup_result]
+      removed_directories: [/tmp/home-server-ops/task-04-beszel-caddy-20261026T143034Z, /tmp/home-server-ops/task-04-beszel-agent-20261026T145932Z]
+      state: 用户返回两次Removed，确认本轮两个临时备份目录已清理，不再依赖其中副本回退
+    boundary: 未开展ShellUI、PWA或其他监控主机接入；未新增公网端口或路由器映射依据用户交接，不当作独立WAN审计
   crawlab:
     source: [crawlab_prepared, crawlab_master_started, crawlab_home_ui, crawlab_worker_online, crawlab_master_disabled, crawlab_smoke_result, crawlab_api_result, crawlab_lan_applied, crawlab_lan_review]
     purpose: 爬虫平台体验部署，Master、专用 MongoDB 和一个 Worker
@@ -450,7 +495,7 @@ services:
 
   caddy:
     source: [local, admin, https_final_handoff, https_final_review, caddy_applied_handoff, caddy_applied_review]
-    purpose: Tududi 公网及局域网 HTTPS，并保留局域网 HTTP 入口
+    purpose: 统一Web入口：Tududi公网及LAN，Crawlab／Beszel仅LAN，保留局域网HTTP入口
     image: caddy:2.11.4-alidns
     image_scope: 自定义镜像由用户确认运行，本地核对 Compose 声明及有效 AliDNS TLS 配置，未查询 Docker inspect
     state: running
@@ -460,12 +505,12 @@ services:
     compose: /srv/apps/caddy/compose.yaml
     http_port: 80
     https_port: 443
-    caddyfile_sites: ["https://<TUDUDI_FQDN>", "https://<TUDUDI_FQDN>:4129", "http://<TUDUDI_FQDN>", "http://192.168.1.110", "https://crawlab.<DOMAIN>:4129"]
+    caddyfile_sites: ["https://<TUDUDI_FQDN>", "https://<TUDUDI_FQDN>:4129", "http://<TUDUDI_FQDN>", "http://192.168.1.110", "https://crawlab.<DOMAIN>:4129", "https://beszel.<DOMAIN>:4129"]
     ingress_review:
       source: [caddy_applied_handoff, caddy_applied_review, ufw_4129_handoff, lan_4129_review, caddy_backup_exit_review, caddy_rollback_cleanup_review]
-      current_file_sha256: 40cd6be91391679516e626a8663b3a0c2011112805b4462fc34aff0239c24238
-      latest_change_source: [crawlab_lan_applied, crawlab_lan_review]
-      latest_change: 只追加Crawlab LAN4129站点；既有站点保持，Caddy及Crawlab的Compose哈希未变，原入口200回归通过
+      current_file_sha256: 9154cee5b590fff138db93997132a325d6e199b1d599b086fb762246d3ff506d
+      latest_change_source: [beszel_handoff, beszel_review]
+      latest_change: 新增Beszel_LAN4129站点，复用lan_only并反代回环8090；有效配置保留Tududi／Crawlab／内网IP站点，Windows原Tududi／Crawlab内网可信HTTPS200回归通过；未逐字节比较全部旧配置
       current_http_listeners: [":80", ":443", "192.168.1.110:4129"]
       lan_4129_configured: true
       declaration: Compose 与审查基线相同；仍为 host 网络、自定义镜像、单文件只读 bind 及既有 env_file，未读取凭据
@@ -719,11 +764,11 @@ network:
     ipv4_nat: 交接报告 127.0.0.1 的 13002、19876 分别转发至 Tududi、DDNS 容器端口
     scope: 用户执行的只读检查摘要；仅为部分链与 NAT 快照，不构成完整转发安全审查，默认 DROP 不证明所有访问路径安全
   listeners:
-    source: [local, https_final_review, caddy_applied_review, split_dns_server_review]
-    non_loopback_tcp: [22, 53, 80, 443, 4129]
-    loopback_tcp: [53, 13002, 19876, 2019]
+    source: [local, https_final_review, caddy_applied_review, split_dns_server_review, crawlab_delivery_review, beszel_review]
+    non_loopback_tcp: [22, 53, 80, 443, 4129, 19666]
+    loopback_tcp: [53, 8090, 13002, 13003, 19876, 2019]
     caddy_active_listen: [":80", ":443", "192.168.1.110:4129"]
-    scope: Caddy及DNS监听按2026-10-25复核更新，其余端口沿用原来源，不作为完整实时监听清单
+    scope: Caddy及DNS沿用2026-10-25基线；2026-10-26核对Crawlab回环13003／LAN19666及Beszel回环8090／LAN4129，其余端口沿用原来源，不作为完整实时监听清单
     tcp_443_observed: true
   pending:
     - 完整 Docker 转发链审查

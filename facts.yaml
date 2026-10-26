@@ -1,6 +1,7 @@
 # 已记录的服务器快照，不代表持续监测；conventions 为运行规范，不代表实施结果。均不是可直接部署的配置。
 updated: "2026-10-26"
 sources:
+  airtcp_bypass_fix_review: {by: 本地 Codex, checked_at: "2026-10-26T15:43:47+08:00", method: 修复本地工具和使用说明，以Windows PowerShell隔离执行20项正常／拒绝写入检查，并复核安装DLL及原始备份哈希, scope: Patch／Verify／Restore闭环、旧清单兼容、缺失或损坏清单、错误哈希／来源／结构、多备份选择、目标已变化及未知版本拦截均通过；测试文件已清理，未还原或重打当前安装DLL、修改注册表或服务器}
   airtcp_bypass_confirmation: {by: 用户, date: "2026-10-26", method: 提供本地AirTCP绕过补丁工具并明确确认测试可用, scope: 本机使用结果；未逐项提供代理切换和客户端重启测试记录，不扩大为其他设备验收}
   airtcp_bypass_review: {by: 本地 Codex, checked_at: "2026-10-26T15:27:43+08:00", method: 静态审阅脚本和说明、隔离副本Patch／Verify／Restore及错误哈希清单测试、只读检查安装DLL和真实桌面用户代理、正常DNS及内网HTTPS, scope: 副本补丁与安装文件哈希一致、21项绕过表保留原20项、HTTPS200且TLS校验0；复现Restore跳过清单校验，未修改安装程序、注册表或服务器，未独立切换代理及重启客户端}
   local: {by: 本地 Codex, date: "2026-10-21", method: SSH 只读核验}
@@ -539,16 +540,17 @@ network:
       proxy_change_scope: 2026-10-26由手动添加Tududi精确项改为客户端DLL补丁生成子域名通配项，保留原20条绕过项及系统代理；覆盖全部子域但不含根域，不区分网络，不直接照搬到移动笔记本
       proxy_cause_user_reported: AirTCP使用远程DNS得到家庭公网地址，geoip-cn选择国内直连后受NAT回环限制影响；不是远程代理节点转发该请求
       airtcp_bypass_patch:
-        source: [airtcp_bypass_confirmation, airtcp_bypass_review]
-        acceptance: 当前固定台式机使用阶段通过；不将工具的自动回退和跨版本兼容性认定为已通过
+        source: [airtcp_bypass_confirmation, airtcp_bypass_review, airtcp_bypass_fix_review]
+        acceptance: 当前固定台式机使用阶段及固定版本隔离回退验证通过；跨版本兼容性未验收
         version: "1.0.39+31"
         mechanism: 修改本机air_service_plugin.dll，保留原列表并新增只读.bypass节、重定向唯一代码引用；目的为避免客户端重新开启系统代理时覆盖手动绕过项
         original_sha256: A381728EFEB60837651C422A3E55E643D6CB4754486BBAF7CCEDCE9BAD615AFE
         patched_sha256: 6960D6F94A62B070FE67572BB9C9F3DA3380F95EE9E0A028D03E4F86BD6FEBD9
         patched_bytes: 220672
         scope: 仅使用Windows系统代理绕过设置的应用；不保证自带代理／DNS或TUN应用遵循，未来子域名需同时具有DNS和获准Caddy路由，通配项本身不开放服务
-        rollback_limit: Restore将.dll.bak误映射为.dll.json，但实际清单是.json，导致哈希校验被跳过；当前还原前必须独立比对原始哈希及版本，不依赖自动选择最新备份，防止覆盖升级后的DLL
-        maintenance_limit: 仅验收上述固定版本及哈希；升级可能替换补丁，须重新核验版本、PE结构、签名及实际代理行为，不照说明直接跨版本重打
+        rollback_verification: 已修正.dll.bak与.json配对；强制有效清单、原始哈希、来源路径、结构及当前DLL与预期补丁一致性校验，写后核对完整哈希；清单缺失或校验失败即停止，多备份须用BackupFile明确选择，不自动取最新文件；兼容现有旧清单
+        tool_sha256: 0B22090A56C440B5D541AE67C83BA10B338B5D3B74DEB781D640CFD0DC232EDA
+        maintenance_limit: Patch已限制上述审核原始哈希，未知构件拒绝写入；Restore拒绝覆盖与备份不对应的当前DLL。升级后仍须重新审核适配和实际代理行为，不能把保护逻辑当作跨版本兼容证明
         rollback_material: 本机现有原始DLL及清单为当前二进制修改的回退资料，未删除；用途在恢复原版并验证或升级替换补丁后结束，届时核对无依赖再精确清理。复核日期2026-11-02或升级／还原时，以先到者为准；不自动累积新副本
       acceptance: 用户确认本机方案测试可用；本地确认安装补丁、实际启用的代理及子域名通配绕过，正常DNS到192.168.1.110且未用--resolve的直连HTTPS200／TLS校验0；代理切换及重启后的保持性未由本地独立操作验证
     redmi_pilot:

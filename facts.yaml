@@ -1,6 +1,8 @@
 # 已记录的服务器快照，不代表持续监测；conventions 为运行规范，不代表实施结果。均不是可直接部署的配置。
 updated: "2026-10-27"
 sources:
+  wifi_pac_handoff: {by: 用户转交Web实施结果及确认, date: "2026-10-27", scope: 手机恢复DHCP并配置PAC后访问正常、三个服务经代理正常及未授权目标拒绝、配置校验与Caddy热重载、UFW仅LAN放行、八个临时文件及本轮目录清理按用户交接记录；笔记本及实际重启恢复未验收}
+  wifi_pac_review: {by: 本地Codex, checked_at: "2026-10-27T21:12:41.895082+08:00", pac_http_checked_at: "2026-10-27T21:15:08.418509+08:00", method: SSH只读核对Squid版本／正式配置及include顺序、服务active和enabled、LAN监听及Caddy有效HTTP路由，本机直连读取PAC并以JavaScript离线检查12项分流, scope: PAC为200及正确类型／no-store且与生效配置一致，受限ACL和内网监听符合交接；未重跑Squid代理测试、查询UFW规则或遍历临时目录，未修改配置、重启或操作手机}
   ssh_interaction_policy: {by: 用户交接与原始命令／末尾输出、本地Codex审查, date: "2026-10-27", method: 核对Bash及curl官方说明，以本地模拟命令验证7种Shell控制流，不连接服务器或重跑Squid测试, scope: 原函数在既有errexit开启且curl返回非零时会提前退出，未开启时可继续；符合输出中断位置但缺少当时Shell选项及会话退出证据，事件根因未确定；本次只更新交互规范，不验收Squid部署}
   caddy_annotation_correction: {by: 用户执行、本地Codex独立复核, checked_at: "2026-10-27T00:25:03+08:00", method: 用户返回原位更正成功及新哈希，本地SSH只读核对首行和全文件SHA并将原首行拼回后与旧哈希比对, scope: 新首行为稳定用途说明、哈希与用户一致、旧错误注释已不存在且其余字节与修改前完全相同；未由本地写入或重载服务器}
   information_integrity_policy: {by: 用户要求、本地Codex落实, date: "2026-10-27", scope: 将配置注释／服务说明／操作指引的认知一致性纳入交付和验收，增加本地只读文字初筛及回归样例；规范已更新，不表示现有服务器文字已全部整改}
@@ -498,8 +500,8 @@ services:
     pending: [备份文件一致性, uploads 备份覆盖, 恢复能力]
 
   caddy:
-    source: [local, admin, https_final_handoff, https_final_review, caddy_applied_handoff, caddy_applied_review]
-    purpose: 统一Web入口：Tududi公网及LAN，Crawlab／Beszel仅LAN，保留局域网HTTP入口
+    source: [local, admin, https_final_handoff, https_final_review, caddy_applied_handoff, caddy_applied_review, wifi_pac_handoff, wifi_pac_review]
+    purpose: 统一Web入口：Tududi公网及LAN，Crawlab／Beszel仅LAN，保留局域网HTTP及LAN PAC分发
     image: caddy:2.11.4-alidns
     image_scope: 自定义镜像由用户确认运行，本地核对 Compose 声明及有效 AliDNS TLS 配置，未查询 Docker inspect
     state: running
@@ -511,8 +513,8 @@ services:
     https_port: 443
     caddyfile_sites: ["https://<TUDUDI_FQDN>", "https://<TUDUDI_FQDN>:4129", "http://<TUDUDI_FQDN>", "http://192.168.1.110", "https://crawlab.<DOMAIN>:4129", "https://beszel.<DOMAIN>:4129"]
     ingress_review:
-      source: [caddy_applied_handoff, caddy_applied_review, ufw_4129_handoff, lan_4129_review, caddy_backup_exit_review, caddy_rollback_cleanup_review]
-      current_file_sha256: 22348d09d2da6b914676a4601b203073acfb7f9b7e73435da937c4baa14bad40
+      source: [caddy_applied_handoff, caddy_applied_review, ufw_4129_handoff, lan_4129_review, caddy_backup_exit_review, caddy_rollback_cleanup_review, wifi_pac_handoff, wifi_pac_review]
+      current_file_sha256: 955de7be65cc381b494941939e05915089f795232fdc43c7b1557d586a3a73ab
       annotation_issue:
         source: [caddy_annotation_review, caddy_annotation_correction]
         status: Corrected
@@ -520,15 +522,15 @@ services:
         finding: 00:16确认正式首行误称候选未加载，与已验收状态矛盾；此前验收遗漏文字一致性检查，该问题已于本次纠正
         correction: 用户已原位改为稳定用途说明，本地回读确认为Home_Server_Caddy_configuration；新哈希与用户一致，替回旧首行可还原旧哈希，证明其余字节未变
         scope: 本次已知注释的文字收尾通过，既有技术验收保留；未重跑旧部署或重写其他内容，不据此宣称所有服务器说明均已审查
-      latest_change_source: [caddy_annotation_correction]
-      latest_change: 用户仅纠正首行误导性状态注释，00:25本地确认其余字节完全未变；Beszel／Tududi／Crawlab及内网IP的既有路由和验收记录保留
+      latest_change_source: [wifi_pac_handoff, wifi_pac_review]
+      latest_change: 用户在现有LAN HTTP来源限制内新增内嵌PAC路由并热重载，本地确认正式注释仍正确、PAC有效配置与实际响应一致；既有Tududi／Crawlab／Beszel及DDNS路由保留，Compose哈希未变
       current_http_listeners: [":80", ":443", "192.168.1.110:4129"]
       lan_4129_configured: true
       declaration: Compose 与审查基线相同；仍为 host 网络、自定义镜像、单文件只读 bind 及既有 env_file，未读取凭据
       tls_and_protocols: AliDNS DNS-01 改为全局统一策略，显式 HTTP 跳转保留 4129，所有 HTTP 服务器使用 h1/h2；未见 443/4129 UDP 监听
       local_result: 服务器本机的 443 与 LAN 地址 4129 均为可信 TLS及 HTTP200，4129 对回环来源返回403；原 LAN HTTP 和 DDNS 路由及来源限制回归通过
       windows_lan_result: 用户添加精确 LAN TCP4129 放行后，本地 Windows 指定192.168.1.110访问域名4129返回HTTP200且证书校验通过；此前超时已消除，未借此声称Split DNS已生效
-      verification_limit: Caddy、Split DNS及固定台式机已分阶段验收；浏览器成功和手机移动数据访问由用户确认，Wi-Fi设备整体仍未验收，本地未登录应用
+      verification_limit: 既有业务TLS结果沿用已列历史来源，本轮核对PAC与有效路由；手机使用由用户确认，Wi-Fi笔记本及实际重启恢复未验收，本地未登录应用
       deployment_reported:
         method: 用户运行脚本校验后原位更新，宿主机与容器文件哈希一致并热重载成功
         rollback_file: /srv/apps/caddy/Caddyfile.before-unified-20261025T093536511233Z
@@ -561,6 +563,24 @@ services:
       - {target: /data, source: /srv/persistent/data/caddy/data, type: bind, writable: true}
       - {target: /config, source: /srv/persistent/data/caddy/config, type: bind, writable: true}
     routes:
+      lan_pac:
+        source:
+        - wifi_pac_handoff
+        - wifi_pac_review
+        url: http://192.168.1.110/proxy.pac
+        storage: JavaScript内嵌正式Caddyfile的respond块，无独立PAC文件
+        allowed_source: 192.168.1.0/24
+        observed_http_status: 200
+        content_type: application/x-ns-proxy-autoconfig
+        cache_control: no-store
+        served_body_sha256: de3f5e731a180638d30212eba99b8863f161b9142a6b83e1035dcf039e99f915
+        proxy_hosts:
+        - tududi.<DOMAIN>
+        - crawlab.<DOMAIN>
+        - beszel.<DOMAIN>
+        proxy_result: PROXY 192.168.1.110:18128
+        other_hosts_result: DIRECT
+        scope: PAC按完整主机名分流，先转小写，不检查URL端口；CONNECT的4129限制由Squid执行。仅对使用PAC的客户端流量有效，未来新服务不会自动纳入
       tududi_domain:
         host: "<TUDUDI_FQDN>"
         upstream: "127.0.0.1:13002"
@@ -588,6 +608,57 @@ services:
       not_after: "2027-01-20T08:07:01Z"
       https_http_status: 200
       renewal: Caddy 自动管理；本轮验证配置及当前证书，不声称已跨续期周期观察
+
+  squid:
+    source:
+    - wifi_pac_handoff
+    - wifi_pac_review
+    purpose: 为支持PAC的家庭Wi-Fi客户端提供受限CONNECT代理，使用服务器DNS访问既有内网HTTPS入口
+    deployment: Ubuntu软件包及systemd服务，非Docker容器
+    package: squid 7.7-0ubuntu0.26.04.1
+    service:
+      unit: squid.service
+      active_state: active/running
+      unit_file_state: enabled
+      reboot_recovery_verified: false
+    config: /etc/squid/squid.conf
+    restricted_config: /etc/squid/conf.d/home-server-pac.conf
+    config_sha256: af37e3badebaeb46ffc734662399fae558c7cba2269dc771dabce2f094acd164
+    restricted_config_sha256: 1e8ea88fea8c657fd71915d8d2d6d5112101b3ee0938894c1e3a3a9f3fd71d5b
+    listen:
+      address: 192.168.1.110
+      port: 18128
+      protocol: tcp
+      scope: 只读监听快照仅此代理绑定，无默认3128或IPv6代理监听
+    dns_nameservers:
+    - 192.168.1.110
+    protocol: HTTP显式代理承载CONNECT隧道，应用TLS由客户端与Caddy完成，未配置TLS解密
+    access_control:
+      client_source: 192.168.1.0/24
+      method: CONNECT
+      hosts:
+      - tududi.<DOMAIN>
+      - crawlab.<DOMAIN>
+      - beszel.<DOMAIN>
+      host_match: dstdom_regex使用首尾锚点及转义点，忽略大小写，非子域通配
+      destination_ip: 192.168.1.110
+      destination_port: 4129
+      allow_rule: http_access allow home_lan_clients CONNECT home_service_host home_service_ip home_service_port
+      ordering: 主配置的安全端口／manager／本地与链路本地目标保护在前，conf.d限制规则在最终deny all之前；debian.conf仅设置logfile_rotate，不额外放行
+      scope: 上述条件同时匹配才允许业务隧道；不作为通用互联网代理，不替代应用认证。主配置另保留localhost manager管理例外
+    references:
+      acl: https://www.squid-cache.org/Doc/config/acl/
+      http_access: https://www.squid-cache.org/Doc/config/http_access/
+      dns_nameservers: https://www.squid-cache.org/Doc/config/dns_nameservers/
+    acceptance:
+      local_verified: 正式文件、全部当前conf.d片段、限定监听、active及enabled，PAC有效路由和本机HTTP响应；不由本地重跑代理业务测试
+      user_reported: Squid配置检查和ACL测试通过，三个服务经代理正常，未授权目标拒绝，LAN UFW放行及手机PAC访问正常
+      limits: Windows Wi-Fi笔记本未开始；开机启用已确认，实际重启恢复尚未测试
+    temporary_cleanup:
+      source:
+      - wifi_pac_handoff
+      state: 用户交接确认本轮八个临时候选／备份文件及任务目录已清理，正式配置和运行日志保留
+      scope: 未提供精确路径，本地未遍历清理目录；不推定其他历史任务目录已删除，不为笔记本测试保留本轮临时副本
 
   dnsmasq:
     source: [split_dns_handoff, split_dns_server_review]
@@ -698,15 +769,15 @@ network:
       user_confirmed: 真实外网访问、本轮实际使用、路由器唯一映射及旧映射清理、UFW 收尾、容器重建及两端配置校验一致
     future_standard_ports: 若以后标准端口可用，优先调整路由器及必要的跳转配置，保持服务器 443 与 Tududi 13002 不变
   unified_url_discussion:
-    source: [unified_url_handoff, caddy_ingress_design, caddy_applied_handoff, caddy_applied_review, ufw_4129_handoff, lan_4129_review, split_dns_handoff, split_dns_server_review, split_dns_desktop_review]
+    source: [unified_url_handoff, caddy_ingress_design, caddy_applied_handoff, caddy_applied_review, ufw_4129_handoff, lan_4129_review, split_dns_handoff, split_dns_server_review, split_dns_desktop_review, wifi_pac_handoff, wifi_pac_review]
     status: Pending verification
     target_url: "https://tududi.<DOMAIN>:4129"
     reusable_goal: 后续获准 Web 服务沿用每服务子域名及内外网统一 4129 入口，Tududi 首项验收；扩容规则见 conventions.network.web_ingress
-    user_reported_constraints: 路由器不能NAT回环或本地DNS；固定台式机已验收，手机Wi-Fi仍失败，手机及笔记本后续由用户选择再启动
-    acceptance_scope: 服务器Split DNS及有线台式机同URL阶段已验收；Wi-Fi设备及切网行为尚未整体验收，原LAN HTTP入口保留
-    implementation: dnsmasq只监听家庭IPv4和IPv6链路本地地址，子域名通配A到192.168.1.110，根域及其他域名转发192.168.1.1；见services.dnsmasq
+    user_reported_constraints: 路由器不能NAT回环或本地DNS；固定有线台式机已验收，手机改用DHCP和Wi-Fi PAC并已通过；笔记本待设备可用后测试
+    acceptance_scope: 服务器Split DNS、有线台式机及手机PAC阶段已验收；笔记本兼容性／切网测试未完成，原LAN HTTP入口保留
+    implementation: dnsmasq保留既有子域名Split DNS供直接客户端及Squid使用；手机DHCP取得网络配置，由PAC将三个服务送至LAN Squid，再连接Caddy LAN4129；其余主机名DIRECT，详见services.squid及services.caddy.routes.lan_pac
     lan_https: Caddy 已新增192.168.1.110:4129并限制LAN来源；精确UFW放行后Windows直连返回可信HTTPS200，既有公网映射未改
-    execution: Caddy、LAN4129、服务器DNS及固定有线台式机已完成；手机/笔记本接入留为未启动子任务，不因它们延长已验收阶段副本保留
+    execution: 服务器Caddy／DNS／Squid及固定台式机、手机阶段完成；笔记本仅待客户端验收，不预设重新部署服务器。重启恢复未实测，不因客户端后续测试延长本轮临时副本保留
     details: Wi-Fi终端剩余任务、验收及清理见progress.md任务11；既有服务器与台式机事实按本文件复用
   clients:
     desktop:
@@ -733,24 +804,28 @@ network:
         rollback_material: 本机现有原始DLL及清单为当前二进制修改的回退资料，未删除；用途在恢复原版并验证或升级替换补丁后结束，届时核对无依赖再精确清理。复核日期2026-11-02或升级／还原时，以先到者为准；不自动累积新副本
       acceptance: 用户确认本机方案测试可用；本地确认安装补丁、实际启用的代理及子域名通配绕过，正常DNS到192.168.1.110且未用--resolve的直连HTTPS200／TLS校验0；代理切换及重启后的保持性未由本地独立操作验证
     redmi_pilot:
-      source: [split_dns_handoff]
-      reported_settings: {ipv4_mode: static, ipv4: 192.168.1.121, gateway: 192.168.1.1, prefix_length: 24, dns1: 192.168.1.110, android_private_dns: off}
-      dns2: 截图初始为公共DNS，最终保存值未重新提供，未认定建议已执行
-      reported_result: 家庭Wi-Fi仍失败，移动数据可访问同一Tududi URL
-      root_cause: 未确定；不据此判定服务器DNS失败，也不默认归因于DNS2或IPv6
-      continuation: 用户要求留为后续子任务，未授权本轮继续排查或修改已验收的服务器及台式机配置
+      source:
+      - wifi_pac_handoff
+      reported_settings:
+        ipv4_mode: DHCP
+        dns: 由DHCP自动获取
+        wifi_proxy: PAC自动代理
+        pac_url: http://192.168.1.110/proxy.pac
+      reported_result: 用户确认小米手机配置家庭Wi-Fi PAC后访问正常，本设备接入阶段已验收
+      previous_attempt: 2026-10-25静态IP及手动DNS方案曾失败，具体根因未确定；原静态设置及旧失败不作为当前状态
+      scope: 手机设置及使用结果依据用户交接，本地只核对服务器和PAC；不扩大为全部Android应用、Windows笔记本或服务器重启恢复已验证
   interface: enp34s0
   ipv4: 192.168.1.110/24
   gateway: 192.168.1.1
   netplan: {file: /etc/netplan/00-installer-config.yaml, dhcp4: false, dhcp6: true}
   ipv6: {global_scope_address_observed: true, address: 不公开}
   ufw:
-    rules_source: [https_final_handoff, network_handoff, ufw_4129_handoff, split_dns_handoff, crawlab_worker_firewall_result, crawlab_worker_override_applied]
+    rules_source: [https_final_handoff, network_handoff, ufw_4129_handoff, split_dns_handoff, crawlab_worker_firewall_result, crawlab_worker_override_applied, wifi_pac_handoff]
     active: true
     default: {incoming: deny, outgoing: allow, routed: deny}
     default_last_verified: "2026-10-25"
     previous_report: {source: [network_handoff], default_unchanged_reported: true, ipv6_config_enabled: true, ipv6_user_allow_rules_shown: false, scope: 交接摘要报告 IPV6=yes、未显示对应 v6 用户放行规则；不等于 IPv6 无流量或公网安全已验证}
-    latest_report: {source: [split_dns_handoff, crawlab_worker_firewall_result, crawlab_worker_override_applied], result: 用户已追加Docker到宿主DNS／HTTPS及LAN和Docker到宿主19666规则，Worker重建后DNS／HTTPS／gRPC_TCP均通过, scope: 新规则及容器测试依据用户输出；仅LAN端口绑定另有本地只读确认，不扩大为完整转发隔离或IPv6公网审计}
+    latest_report: {source: [wifi_pac_handoff], result: 在既有规则上新增仅家庭LAN到Squid TCP18128的放行，按用户交接确认, scope: 本地无权读取UFW规则；不描述为完整防火墙或公网审计，既有Docker及IPv6来源记录保留}
     user_rules:
       - {from: 192.168.1.0/24, protocol: tcp, ports: [22, 80], action: allow}
       - {from: 192.168.1.0/24, to: 192.168.1.110, protocol: tcp, ports: [4129], action: allow, source: [ufw_4129_handoff]}
@@ -763,6 +838,7 @@ network:
       - {from: 172.20.0.0/16, to: 192.168.1.110, protocol: tcp, ports: [53, 4129], action: allow, source: [crawlab_worker_firewall_result]}
       - {from: 192.168.1.0/24, to: 192.168.1.110, protocol: tcp, ports: [19666], action: allow, source: [crawlab_worker_override_applied]}
       - {from: 172.20.0.0/16, to: 192.168.1.110, protocol: tcp, ports: [19666], action: allow, source: [crawlab_worker_override_applied]}
+      - {from: 192.168.1.0/24, protocol: tcp, ports: [18128], action: allow, source: [wifi_pac_handoff], scope: 交接确认仅LAN放行，具体目标地址匹配未独立读取}
     removed: 公网 TCP 80 放行规则，用户确认
   firewall_snapshot_reported:
     source: [network_handoff]
@@ -775,11 +851,11 @@ network:
     ipv4_nat: 交接报告 127.0.0.1 的 13002、19876 分别转发至 Tududi、DDNS 容器端口
     scope: 用户执行的只读检查摘要；仅为部分链与 NAT 快照，不构成完整转发安全审查，默认 DROP 不证明所有访问路径安全
   listeners:
-    source: [local, https_final_review, caddy_applied_review, split_dns_server_review, crawlab_delivery_review, beszel_review]
-    non_loopback_tcp: [22, 53, 80, 443, 4129, 19666]
+    source: [local, https_final_review, caddy_applied_review, split_dns_server_review, crawlab_delivery_review, beszel_review, wifi_pac_review]
+    non_loopback_tcp: [22, 53, 80, 443, 4129, 18128, 19666]
     loopback_tcp: [53, 8090, 13002, 13003, 19876, 2019]
     caddy_active_listen: [":80", ":443", "192.168.1.110:4129"]
-    scope: Caddy及DNS沿用2026-10-25基线；2026-10-26核对Crawlab回环13003／LAN19666及Beszel回环8090／LAN4129，其余端口沿用原来源，不作为完整实时监听清单
+    scope: Caddy及DNS沿用2026-10-25基线；2026-10-26核对Crawlab回环13003／LAN19666及Beszel回环8090／LAN4129，其余端口沿用原来源，不作为完整实时监听清单；2026-10-27仅复核Squid的LAN18128及Caddy监听，未见默认3128或额外IPv6代理绑定
     tcp_443_observed: true
   pending:
     - 完整 Docker 转发链审查
@@ -845,12 +921,12 @@ conventions:
       public_checks: [DNS或DDNS, 路由器外部及内部端口, 监听地址, 对应协议族防火墙, Caddy站点及TLS与上游, 应用认证授权, IPv4与IPv6各自的暴露路径]
       internal_interfaces: 数据库、缓存及 Docker 管理接口等内部端口不直接公开；没有用途的公网端口保持关闭
     web_ingress:
-      source: [caddy_ingress_design, split_dns_handoff]
-      date: "2026-10-25"
+      source: [caddy_ingress_design, split_dns_handoff, wifi_pac_handoff, wifi_pac_review]
+      date: "2026-10-27"
       scope: 后续 Web 服务的复用规则；实际实施范围及验证状态见 services.caddy 与 network.unified_url_discussion
       names: 每项服务使用明确子域名；同一服务内外网共用域名、HTTPS 和 4129 端口，以 Tududi 为首项验证
       public_path: 公网 DNS/DDNS → 路由器 TCP 4129 → 服务器 443 → Caddy 按域名选择回环上游；新增 Web 服务共用该映射
-      lan_path: 家庭 DNS 将获准主机名解析至 192.168.1.110 → Caddy LAN 4129 → 同一上游；DNS 不负责改端口
+      lan_path: 直接客户端使用家庭DNS到192.168.1.110的Caddy LAN4129；PAC客户端通过LAN Squid，由Squid用家庭DNS连接同一入口；DNS不负责改端口，PAC不接管所有应用的解析
       access_classes:
         public_and_lan: 经用户明确授权，在 443 与 LAN 4129 分别声明该服务域名；应用认证授权仍由应用负责
         lan_only: 仅在 192.168.1.110 的 4129 声明域名，并限制来源 192.168.1.0/24；不创建该服务的公网 443 代理路由
@@ -862,7 +938,7 @@ conventions:
       redirects: 保留自动证书管理，仅禁用自动 HTTP 跳转；需要的域名跳转显式指向 https://主机名:4129 并保留 URI，不开放公网 80
       protocols: 当前按 TCP 链路规划 h1/h2，不额外监听或映射 HTTP/3 的 UDP；以后确有需求再核对 UDP 转发及通告端口
       dns: 当前用户接受子域名通配A并本地处理其其他记录类型，根域仍转发；新增独立记录需求先设计例外，实际规则见services.dnsmasq，DNS解析不等于自动创建Caddy站点
-      expansion: 先确定访问级别、域名、上游及应用外部 URL；按需配置公网 DNS、LAN DNS 和证书权限，再校验、应用并回归既有入口，最后更新事实与进度
+      expansion: 先确定访问级别、域名、上游及应用外部 URL；按需配置公网 DNS、LAN DNS 和证书权限，再校验、应用并回归既有入口，最后更新事实与进度；需要供PAC客户端访问的新服务还须明确加入PAC主机清单和Squid域名ACL，Caddy或DNS新增不会自动获得代理放行
       change_control: 不修改全局 https_port；保留当前公网映射、LAN HTTP、DDNS 管理来源限制及证书数据目录；正式变更由用户执行
       file_loading: 单文件 bind 更新时核对宿主机、容器文件及有效路由，确认旧 inode 问题后才重建；以后拆分 include 文件需同步调整挂载，不能仅创建容器不可见的片段
       references:

@@ -802,8 +802,9 @@ conventions:
     script_use: 复杂或需重复执行的操作可以交付脚本或配置包，同时说明内容、运行命令、验证、回退及文件去向；不要求用户为每个步骤另存脚本
     execution_safety:
       phases: 按检查、候选校验、正式修改、访问验证和清理分阶段；不把修改／重启／多项网络测试／清理串成一次粘贴。依赖失败即暂停后续变更，无关只读诊断可分别继续并记录结果
-      login_shell: 不直接粘贴会退出或替换登录Shell的exit／logout／exec，不在登录Shell开启set -e／set -u／pipefail或安装trap，不source部署脚本；需要严格模式时用独立bash脚本或带引号heredoc，并在外层用if分支接住返回码，不能仅靠子Shell隔离
-      expected_failures: 拒绝／错误端口等负向测试逐项使用条件分支（if command; then rc=0; else rc=$?; fi）捕获原始退出码，再判断预期结果；不能只在命令后echo $?或用|| true掩盖错误。分别记录curl退出码、HTTP或CONNECT状态及必要日志，非零退出码不自动等于验收失败，HTTP 000不代表已证实目标服务故障
+      delivery_responsibility: 交付方审查最终命令的执行上下文，直接粘贴命令默认兼容登录Shell可能遗留的严格模式，不以用户先检查history／Shell选项或自行辨认上下文作为安全前提；简单操作仍直接给命令
+      login_shell: 禁止在登录Shell开启set -e／set -u／pipefail，包括set -eu和set -euo pipefail等组合；不直接粘贴会退出或替换登录Shell的exit／logout／exec，不安装trap，不source部署脚本。确需严格模式仅在独立启动的bash脚本或bash heredoc内使用，外层用if分支接住返回码，不能仅靠子Shell隔离
+      expected_failures: 拒绝／错误端口／grep无匹配等预期非零检查逐项使用条件分支（if command; then rc=0; else rc=$?; fi）捕获原始退出码，再判断预期结果；不能只在命令后echo $?或用|| true掩盖错误。分别记录curl退出码、HTTP或CONNECT状态及必要日志，非零退出码不自动等于验收失败，HTTP 000不代表已证实目标服务故障
       timeouts: 网络探测明确连接与总超时，其他可能阻塞的检查按需限时；超时只表示本次检查未完成。配置写入、安装、迁移等有副作用步骤不机械套强制终止，先说明中断风险和恢复检查
       records: 少量短检查可直接回传终端输出；批量／耗时或中断后难判断的操作按需在任务临时目录保留stdout与stderr、各步骤退出码、开始／结束时间及阶段标记，先确认可写并报告准确路径。输出避免凭据，不默认set -x；使用tee须保留原命令退出码，不能将tee成功当命令成功
       reconnect: 会话消失、步骤完成及验收通过分别判断；按最后已知步骤核对已有输出、相关进程／服务、配置哈希和日志，缺少结束标记只表示结果未知。先区分Shell退出与SSH传输中断，不凭断线重启服务或重跑整组命令，也不要求重查无关基础信息

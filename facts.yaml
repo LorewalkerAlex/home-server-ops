@@ -1,6 +1,7 @@
 # 已记录的服务器快照，不代表持续监测；conventions 为运行规范，不代表实施结果。均不是可直接部署的配置。
 updated: "2026-10-27"
 sources:
+  caddy_format_acceptance: {by: 用户执行、本地Codex独立复核, checked_at: "2026-10-27T21:48:41+08:00", pac_checked_at: "2026-10-27T21:50:15+08:00", method: 用户返回fmt／等价／两端回读和自动清理成功输出，本地SSH只读核对新哈希、inode／属主／权限、前后adapt等价及有效HTTP配置，并从本机直连读取PAC, scope: 新哈希fa6041cb…一致、格式警告消失、HTTP配置及PAC正文未变；临时脚本／副本／任务目录清理按用户输出接受，未独立遍历受限目录，未由本地修改或重载服务器}
   format_temporary_policy: {by: 用户要求、本地Codex审查, date: "2026-10-27", checked_at: "2026-10-27T21:34:50+08:00", method: SSH只读核对当前Caddyfile并调用仅转换的adapt接口，检查统一临时根目录元数据，参照Caddy官方fmt说明, scope: 当前格式警告仍在，转换成功且有效HTTP配置未变；临时根目录已存在为0700且非符号链接；新增格式与临时产物规范，格式修正仅准备命令尚未在服务器执行}
   wifi_pac_handoff: {by: 用户转交Web实施结果及确认, date: "2026-10-27", scope: 手机恢复DHCP并配置PAC后访问正常、三个服务经代理正常及未授权目标拒绝、配置校验与Caddy热重载、UFW仅LAN放行、八个临时文件及本轮目录清理按用户交接记录；笔记本及实际重启恢复未验收}
   wifi_pac_review: {by: 本地Codex, checked_at: "2026-10-27T21:12:41.895082+08:00", pac_http_checked_at: "2026-10-27T21:15:08.418509+08:00", method: SSH只读核对Squid版本／正式配置及include顺序、服务active和enabled、LAN监听及Caddy有效HTTP路由，本机直连读取PAC并以JavaScript离线检查12项分流, scope: PAC为200及正确类型／no-store且与生效配置一致，受限ACL和内网监听符合交接；未重跑Squid代理测试、查询UFW规则或遍历临时目录，未修改配置、重启或操作手机}
@@ -514,13 +515,15 @@ services:
     https_port: 443
     caddyfile_sites: ["https://<TUDUDI_FQDN>", "https://<TUDUDI_FQDN>:4129", "http://<TUDUDI_FQDN>", "http://192.168.1.110", "https://crawlab.<DOMAIN>:4129", "https://beszel.<DOMAIN>:4129"]
     ingress_review:
-      source: [caddy_applied_handoff, caddy_applied_review, ufw_4129_handoff, lan_4129_review, caddy_backup_exit_review, caddy_rollback_cleanup_review, wifi_pac_handoff, wifi_pac_review]
-      current_file_sha256: 955de7be65cc381b494941939e05915089f795232fdc43c7b1557d586a3a73ab
+      source: [caddy_applied_handoff, caddy_applied_review, ufw_4129_handoff, lan_4129_review, caddy_backup_exit_review, caddy_rollback_cleanup_review, wifi_pac_handoff, wifi_pac_review, caddy_format_acceptance]
+      current_file_sha256: fa6041cbdb901206dbc333771ad962554831d91ce94b3a6e7979b725072a5b8b
       formatting:
-        source: [format_temporary_policy]
-        status: Pending user execution
-        finding: 21:34读取的正式文件在adapt时仍提示第3行未格式化；语法转换成功不能替代格式收尾
-        scope: 已准备使用现有容器fmt、转换结果等价及inode保持的修正；用户尚未执行，不修改当前文件哈希或声明格式已通过
+        source: [format_temporary_policy, caddy_format_acceptance]
+        status: Passed
+        previous_finding: 21:34正式文件在adapt时仍有第3行格式警告，随后由用户执行修正
+        result: 用户使用现有容器fmt完成规范排版；21:48本地复核格式警告消失，前后adapt结果等价、inode／属主／0664权限保持，有效HTTP配置未变；21:50 PAC为200且正文哈希与修改前相同
+        cleanup: 用户输出确认本轮临时副本、脚本及/tmp/home-server-ops/caddy-format-20261027-01目录已清理，不再重复执行上传器通用清理提示；本地未遍历该目录
+        scope: 仅格式收尾，未重载／重启服务或变更路由与PAC逻辑；本阶段完成，笔记本验收不在本次范围
       annotation_issue:
         source: [caddy_annotation_review, caddy_annotation_correction]
         status: Corrected
@@ -528,8 +531,8 @@ services:
         finding: 00:16确认正式首行误称候选未加载，与已验收状态矛盾；此前验收遗漏文字一致性检查，该问题已于本次纠正
         correction: 用户已原位改为稳定用途说明，本地回读确认为Home_Server_Caddy_configuration；新哈希与用户一致，替回旧首行可还原旧哈希，证明其余字节未变
         scope: 本次已知注释的文字收尾通过，既有技术验收保留；未重跑旧部署或重写其他内容，不据此宣称所有服务器说明均已审查
-      latest_change_source: [wifi_pac_handoff, wifi_pac_review]
-      latest_change: 用户在现有LAN HTTP来源限制内新增内嵌PAC路由并热重载，本地确认正式注释仍正确、PAC有效配置与实际响应一致；既有Tududi／Crawlab／Beszel及DDNS路由保留，Compose哈希未变
+      latest_change_source: [caddy_format_acceptance]
+      latest_change: 用户仅完成规范格式化并原位写回，本地确认前后配置语义等价、格式警告消失及有效HTTP配置／PAC正文不变；没有重载或重启，既有路由和此前Compose核验保留
       current_http_listeners: [":80", ":443", "192.168.1.110:4129"]
       lan_4129_configured: true
       declaration: Compose 与审查基线相同；仍为 host 网络、自定义镜像、单文件只读 bind 及既有 env_file，未读取凭据
@@ -573,6 +576,7 @@ services:
         source:
         - wifi_pac_handoff
         - wifi_pac_review
+        - caddy_format_acceptance
         url: http://192.168.1.110/proxy.pac
         storage: JavaScript内嵌正式Caddyfile的respond块，无独立PAC文件
         allowed_source: 192.168.1.0/24
@@ -873,7 +877,7 @@ operations:
     source: [format_temporary_policy]
     root: /tmp/home-server-ops
     metadata_verified: {directory: true, symlink: false, owner: eureka, mode: "0700"}
-    scope: 仅核对根目录元数据，不表示已遍历或清理所有任务子目录；本轮未在服务器创建文件
+    scope: 仅核对根目录元数据，不表示已遍历或清理所有任务子目录；本地核查未创建服务器文件
   personal_crontab: {root: absent, eureka: absent}
   application_internal_schedulers: 未核验
   backup_plan: 服务基本稳定后再建设 persistent 备份，尚未建立经恢复验证的方案

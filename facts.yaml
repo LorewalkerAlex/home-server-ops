@@ -1,6 +1,7 @@
 # 已记录的服务器快照，不代表持续监测；conventions 为运行规范，不代表实施结果。均不是可直接部署的配置。
 updated: "2026-10-27"
 sources:
+  ssh_interaction_policy: {by: 用户交接与原始命令／末尾输出、本地Codex审查, date: "2026-10-27", method: 核对Bash及curl官方说明，以本地模拟命令验证7种Shell控制流，不连接服务器或重跑Squid测试, scope: 原函数在既有errexit开启且curl返回非零时会提前退出，未开启时可继续；符合输出中断位置但缺少当时Shell选项及会话退出证据，事件根因未确定；本次只更新交互规范，不验收Squid部署}
   caddy_annotation_correction: {by: 用户执行、本地Codex独立复核, checked_at: "2026-10-27T00:25:03+08:00", method: 用户返回原位更正成功及新哈希，本地SSH只读核对首行和全文件SHA并将原首行拼回后与旧哈希比对, scope: 新首行为稳定用途说明、哈希与用户一致、旧错误注释已不存在且其余字节与修改前完全相同；未由本地写入或重载服务器}
   information_integrity_policy: {by: 用户要求、本地Codex落实, date: "2026-10-27", scope: 将配置注释／服务说明／操作指引的认知一致性纳入交付和验收，增加本地只读文字初筛及回归样例；规范已更新，不表示现有服务器文字已全部整改}
   caddy_annotation_review: {by: 本地 Codex, checked_at: "2026-10-27T00:16:02+08:00", method: SSH只读核对正式Caddyfile首行及哈希, scope: 第1行仍称Candidate_only且not_loaded，文件SHA仍为9154cee5…；与已验收加载状态矛盾，未修改服务器，文字纠正仍待执行}
@@ -792,13 +793,27 @@ operations:
 
 conventions:
   server_interaction:
-    source: [interaction_agreement, rollback_exit_decision, predefined_upload_path]
+    source: [interaction_agreement, rollback_exit_decision, predefined_upload_path, ssh_interaction_policy]
     scope: 本地 Codex 与 Web 指导服务器操作时共用；不改变既有权限和用户执行变更的分工
     inspection: 本地 Codex 优先通过已有只读访问完成任务相关检查；需要管理员权限的最小检查由用户执行，不要求重跑已有有效证据
     default_delivery: 简单操作直接给可复制命令，用户在已有 SSH 会话执行；不为几条命令默认生成、上传独立脚本
     command_format: 标明执行位置、所需权限、作用及预期结果；按可验证的小步提供，遇到失败先分析，不让用户继续执行依赖失败步骤的命令
     inline_code: 少量多行逻辑可使用带引号分隔符的 heredoc；较长逻辑应保持可审查，不把复杂部署隐藏在单条命令或编码内容中
     script_use: 复杂或需重复执行的操作可以交付脚本或配置包，同时说明内容、运行命令、验证、回退及文件去向；不要求用户为每个步骤另存脚本
+    execution_safety:
+      phases: 按检查、候选校验、正式修改、访问验证和清理分阶段；不把修改／重启／多项网络测试／清理串成一次粘贴。依赖失败即暂停后续变更，无关只读诊断可分别继续并记录结果
+      login_shell: 不直接粘贴会退出或替换登录Shell的exit／logout／exec，不在登录Shell开启set -e／set -u／pipefail或安装trap，不source部署脚本；需要严格模式时用独立bash脚本或带引号heredoc，并在外层用if分支接住返回码，不能仅靠子Shell隔离
+      expected_failures: 拒绝／错误端口等负向测试逐项使用条件分支（if command; then rc=0; else rc=$?; fi）捕获原始退出码，再判断预期结果；不能只在命令后echo $?或用|| true掩盖错误。分别记录curl退出码、HTTP或CONNECT状态及必要日志，非零退出码不自动等于验收失败，HTTP 000不代表已证实目标服务故障
+      timeouts: 网络探测明确连接与总超时，其他可能阻塞的检查按需限时；超时只表示本次检查未完成。配置写入、安装、迁移等有副作用步骤不机械套强制终止，先说明中断风险和恢复检查
+      records: 少量短检查可直接回传终端输出；批量／耗时或中断后难判断的操作按需在任务临时目录保留stdout与stderr、各步骤退出码、开始／结束时间及阶段标记，先确认可写并报告准确路径。输出避免凭据，不默认set -x；使用tee须保留原命令退出码，不能将tee成功当命令成功
+      reconnect: 会话消失、步骤完成及验收通过分别判断；按最后已知步骤核对已有输出、相关进程／服务、配置哈希和日志，缺少结束标记只表示结果未知。先区分Shell退出与SSH传输中断，不凭断线重启服务或重跑整组命令，也不要求重查无关基础信息
+      retry: 正式修改前核对相关原始状态及必要回退资料，沿用deployment.rollback_and_cleanup；重试先对照实际状态和已完成记录，不盲目创建副本、覆盖配置或重复加规则。部分应用或记录矛盾先分析，不能仅凭阶段标记自动跳过或续跑
+      lifetime: 留存日志不保证SSH断开后任务继续；不默认后台运行或套nohup。确需独立执行时另行说明执行身份、任务标识、日志与状态查询、成功／失败及停止方法；阶段验收后按既有cleanup清理日志和临时产物，临时目录不承诺重启后仍存在
+      references:
+        - https://www.gnu.org/software/bash/manual/html_node/The-Set-Builtin.html
+        - https://www.gnu.org/software/bash/manual/html_node/Bourne-Shell-Builtins.html
+        - https://www.gnu.org/software/bash/manual/html_node/Signals.html
+        - https://curl.se/docs/manpage.html
     upload_method: 分两步执行；可预先约定唯一任务目录并同轮分别给本地PowerShell上传和完整服务器SSH命令，看到Upload verified后才执行服务器命令，不必仅为取得路径回传一次；不让用户从日志找命令，不默认自动执行，密码按提示输入且不保存，已上传文件可复用
     temporary_directory: /tmp/home-server-ops/<任务标识>-<唯一后缀>/
     temporary_rules: 仅在需要落盘时由用户创建任务专属目录，限制为执行账号访问；一次性脚本、上传包和候选文件集中放置，home 不作为默认暂存位置

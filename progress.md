@@ -225,11 +225,13 @@
 
   验收：目标远程访问方式经过实际验证，是否需要额外服务及维护成本明确；公网暴露范围符合需求，不无必要地开放管理端口。
 
-- [ ] **11. 统一 Web 入口与 Caddy 扩容（Windows Wi-Fi笔记本待验收）**
+- [ ] **11. 统一 Web 入口与 Caddy 扩容（Caddy格式收尾及Windows Wi-Fi笔记本待验收）**
 
   目标：Tududi内外网沿用 `https://<TUDUDI_FQDN>:4129`，家庭走内网入口，外网保留4129→443；Crawlab／Beszel保持仅LAN访问。Caddy、Split DNS、固定有线台式机和手机PAC阶段已验收，任务整体仍未完成。
 
   当前方案：有线台式机沿用家庭DNS及已验收的AirTCP子域名绕过补丁；手机恢复DHCP自动IP／DNS，家庭Wi-Fi设置 `http://192.168.1.110/proxy.pac`。PAC只将Tududi／Crawlab／Beszel主机名交给192.168.1.110:18128，其他主机名DIRECT；Squid再以家庭DNS连接Caddy LAN4129，并限制来源、CONNECT目标主机、内网IP和端口。PAC不替代应用认证，不保证所有应用遵循代理。实际配置及来源见 `services.squid`、`services.caddy.routes.lan_pac`、`network.clients`。
+
+  - [ ] **Caddy正式配置格式收尾**：2026-10-27只读确认格式警告仍在。使用现有Caddy版本fmt，比较前后转换结果及PAC正文等价，原位写回保留inode／属主／权限，再核对宿主和容器读取一致、格式警告消失。执行内容已准备，尚待用户运行；本轮短期回退副本及脚本统一在任务临时目录，自检通过即清理，不为笔记本测试延长保留。不改变路由、凭据、端口、PAC逻辑或重启／重建服务。
 
   - [ ] **Windows Wi-Fi笔记本兼容性及切网测试**：未开始，等待设备可用。家庭Wi-Fi使用DHCP并配置同一PAC URL，确认实际Windows／浏览器能使用PAC，三个服务HTTPS可访问、普通网站正常直连；检查现有代理／VPN冲突，切换其他Wi-Fi后不遗留持续代理问题。Tududi仍应按既有公网入口访问，Crawlab／Beszel不因切网开放公网。按实际Windows设置作用范围验证，不假设设置只作用于家庭Wi-Fi。
 

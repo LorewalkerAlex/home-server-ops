@@ -1,6 +1,7 @@
 # 已记录的服务器快照，不代表持续监测；conventions 为运行规范，不代表实施结果。均不是可直接部署的配置。
 updated: "2026-10-27"
 sources:
+  format_temporary_policy: {by: 用户要求、本地Codex审查, date: "2026-10-27", checked_at: "2026-10-27T21:34:50+08:00", method: SSH只读核对当前Caddyfile并调用仅转换的adapt接口，检查统一临时根目录元数据，参照Caddy官方fmt说明, scope: 当前格式警告仍在，转换成功且有效HTTP配置未变；临时根目录已存在为0700且非符号链接；新增格式与临时产物规范，格式修正仅准备命令尚未在服务器执行}
   wifi_pac_handoff: {by: 用户转交Web实施结果及确认, date: "2026-10-27", scope: 手机恢复DHCP并配置PAC后访问正常、三个服务经代理正常及未授权目标拒绝、配置校验与Caddy热重载、UFW仅LAN放行、八个临时文件及本轮目录清理按用户交接记录；笔记本及实际重启恢复未验收}
   wifi_pac_review: {by: 本地Codex, checked_at: "2026-10-27T21:12:41.895082+08:00", pac_http_checked_at: "2026-10-27T21:15:08.418509+08:00", method: SSH只读核对Squid版本／正式配置及include顺序、服务active和enabled、LAN监听及Caddy有效HTTP路由，本机直连读取PAC并以JavaScript离线检查12项分流, scope: PAC为200及正确类型／no-store且与生效配置一致，受限ACL和内网监听符合交接；未重跑Squid代理测试、查询UFW规则或遍历临时目录，未修改配置、重启或操作手机}
   ssh_interaction_policy: {by: 用户交接与原始命令／末尾输出、本地Codex审查, date: "2026-10-27", method: 核对Bash及curl官方说明，以本地模拟命令验证7种Shell控制流，不连接服务器或重跑Squid测试, scope: 原函数在既有errexit开启且curl返回非零时会提前退出，未开启时可继续；符合输出中断位置但缺少当时Shell选项及会话退出证据，事件根因未确定；本次只更新交互规范，不验收Squid部署}
@@ -515,6 +516,11 @@ services:
     ingress_review:
       source: [caddy_applied_handoff, caddy_applied_review, ufw_4129_handoff, lan_4129_review, caddy_backup_exit_review, caddy_rollback_cleanup_review, wifi_pac_handoff, wifi_pac_review]
       current_file_sha256: 955de7be65cc381b494941939e05915089f795232fdc43c7b1557d586a3a73ab
+      formatting:
+        source: [format_temporary_policy]
+        status: Pending user execution
+        finding: 21:34读取的正式文件在adapt时仍提示第3行未格式化；语法转换成功不能替代格式收尾
+        scope: 已准备使用现有容器fmt、转换结果等价及inode保持的修正；用户尚未执行，不修改当前文件哈希或声明格式已通过
       annotation_issue:
         source: [caddy_annotation_review, caddy_annotation_correction]
         status: Corrected
@@ -863,13 +869,18 @@ network:
 
 operations:
   source: [admin, user]
+  temporary_workspace:
+    source: [format_temporary_policy]
+    root: /tmp/home-server-ops
+    metadata_verified: {directory: true, symlink: false, owner: eureka, mode: "0700"}
+    scope: 仅核对根目录元数据，不表示已遍历或清理所有任务子目录；本轮未在服务器创建文件
   personal_crontab: {root: absent, eureka: absent}
   application_internal_schedulers: 未核验
   backup_plan: 服务基本稳定后再建设 persistent 备份，尚未建立经恢复验证的方案
 
 conventions:
   server_interaction:
-    source: [interaction_agreement, rollback_exit_decision, predefined_upload_path, ssh_interaction_policy]
+    source: [interaction_agreement, rollback_exit_decision, predefined_upload_path, ssh_interaction_policy, format_temporary_policy]
     scope: 本地 Codex 与 Web 指导服务器操作时共用；不改变既有权限和用户执行变更的分工
     inspection: 本地 Codex 优先通过已有只读访问完成任务相关检查；需要管理员权限的最小检查由用户执行，不要求重跑已有有效证据
     default_delivery: 简单操作直接给可复制命令，用户在已有 SSH 会话执行；不为几条命令默认生成、上传独立脚本
@@ -893,7 +904,14 @@ conventions:
         - https://curl.se/docs/manpage.html
     upload_method: 分两步执行；可预先约定唯一任务目录并同轮分别给本地PowerShell上传和完整服务器SSH命令，看到Upload verified后才执行服务器命令，不必仅为取得路径回传一次；不让用户从日志找命令，不默认自动执行，密码按提示输入且不保存，已上传文件可复用
     temporary_directory: /tmp/home-server-ops/<任务标识>-<唯一后缀>/
-    temporary_rules: 仅在需要落盘时由用户创建任务专属目录，限制为执行账号访问；一次性脚本、上传包和候选文件集中放置，home 不作为默认暂存位置
+    temporary_rules: 本项目在服务器手工创建的临时产物统一归入上述任务目录；按需创建且限制访问，根目录和任务目录0700，敏感文件0600，不为短命令强制落盘
+    temporary_workspace:
+      scope: 包括上传包及.partial、一次性脚本、PoC源码与测试数据、候选配置、诊断输出／阶段标记／测试日志及临时回退副本；同一任务的产物集中存放，不另在home、服务目录或其他临时根目录散放
+      lifecycle: 创建前交代用途、准确任务路径、预计文件或资源及退出条件；任务标识加唯一后缀隔离并行操作，不能将目录存在当作允许复用或覆盖。阶段验收后精确清理已登记产物和空任务目录，固定根目录保留
+      non_file_resources: PoC创建的容器、卷、监听、服务等不能仅靠删目录清理，须同步登记标识和退出处置；不因此自动授权创建任何资源
+      exceptions: 工具强制就地创建的中间文件、容器内临时路径或必要运行时设备／挂载须在当前任务明确登记位置、原因和退出方式；软件自身缓存、正式运行日志、业务数据及数据备份遵循各自规则
+      existing_state: 本规范不授权批量移动或删除已有文件；尤其不移动或清理正在使用的HDD映射表、只读设备及挂载。历史遗留按具体任务核对，不能为统一位置破坏当前运行状态
+      persistence: /tmp不保证跨重启或系统清理保留，不保存唯一恢复材料；确需长期复用的脚本、配置或恢复资料审查后转入约定持久位置，并更新引用再退出临时目录
     durable_files: 正式配置和长期维护脚本放在约定的服务或持久路径；临时回退副本按deployment.rollback_and_cleanup退出，临时目录不能作为重要资料的唯一副本
     results: 用户返回必要的脱敏输出；本地 Codex 能直接只读复核的部分自行核验，验收后更新事实、任务和 Git，未执行的操作保持未完成
     cleanup: 交付时说明本次临时文件及回退副本的用途、路径、退出条件和清理方式；本次变更或阶段验收后给出精确清理命令并记录结果，额外保留明确理由和复核时间，不按通配符批删目录
@@ -984,7 +1002,7 @@ conventions:
       iptables_nft_api: https://manpages.debian.org/trixie/iptables/iptables-nft.8.en.html
 
   deployment:
-    source: [deployment_standard_review, rollback_exit_decision, information_integrity_policy]
+    source: [deployment_standard_review, rollback_exit_decision, information_integrity_policy, format_temporary_policy]
     accepted: "2026-10-23"
     scope: 05.2 新服务部署规范与 README 模板；适用于后续部署和变更，不据此批量改造现有服务
     directories: 复用 directories 中 apps、persistent/data、persistent/secrets 和运行时盘的分工，不新增目录体系
@@ -1021,6 +1039,7 @@ conventions:
       screening: 使用只读关键字初筛辅助发现正式配置中的阶段断言和模板残留，报告位置而不回显完整内容或凭据；初筛通过不等于语义验收，Web按相同检查项审阅，无需读取本机私有工具
       scope: 覆盖本次新增／修改及已明确发现的问题，不要求每次全盘重查；真实未知、历史快照和可复用模板可保留准确标识，不机械删除候选或待验证字样
     apply_changes:
+      caddy_format: 使用当前部署版本的caddy fmt规范最终Caddyfile，再校验和应用；fmt检测出差异的非零返回须显式处理，不能触发登录Shell退出。纯排版先比较格式化前后adapt结果及内嵌PAC正文，等价时原位写回并核对容器读取及格式结果，不因排版重启或重建服务
       approval: 服务器变更仍由用户授权；执行前确认现行配置、影响及可用回退资料，失败先分析
       restart: compose restart 只重启现有容器，不用于应用 Compose 或环境变量变更
       reload: 应用配置变化时先用对应服务校验，再使用其支持的重载方式；核对容器确实读到新文件
@@ -1032,9 +1051,11 @@ conventions:
       - 按范围核对声明、实际镜像及挂载、已加载配置或替代验证，并记录主体、时间与结果
       - 验证健康或业务响应及所需访问路径；涉及公网或管理限制时复用网络规范的验证要求
       - 回读正式配置的相关注释和受影响服务说明，与实际结果、当前事实和任务状态一致；未解释差异和未验证项明确，文字收尾与技术结果分别验收
+      - Caddyfile应通过当前版本的规范格式检查，不把格式警告长期当作可忽略项；其他配置按其工具实际支持的检查方式处理
     rollback_and_cleanup:
       rollback: 分别记录配置回退、镜像回退与业务数据恢复；涉及数据库迁移先核对降级兼容性，不能保证仅换回旧镜像即可恢复
       retention: 只为本次变更创建必需的已知可用回退版本，创建前定义用途、回退触发及退出条件，创建后记录准确路径和清理命令；默认本次变更或阶段验收通过后清理，不等待父任务或后续无关工作
+      location: 临时配置回退副本与候选文件同属server_interaction.temporary_workspace，归入当前任务临时目录，不在正式服务目录长期堆积；业务数据备份不套用此位置规则
       retention_exception: 验证失败时用于回退，恢复且核验后清理；确需额外观察时说明理由、具体复核时间和到期处置，不接受只有“继续保留”的安排
       cleanup: 达到退出条件即交付精确清理命令，用户执行后记录实际结果；未收到结果不标为已删除，不按扩展名或目录位置批删
       data_backup_scope: 业务数据备份、原始恢复材料按各自的数据保全与保留策略处理，不套用临时配置副本的退出规则

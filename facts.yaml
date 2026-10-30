@@ -1,6 +1,7 @@
 # 已记录的服务器快照，不代表持续监测；conventions 为运行规范，不代表实施结果。均不是可直接部署的配置。
 updated: "2026-10-30"
 sources:
+  multica_server_connection_configured: {by: 用户执行输出, date: "2026-10-30", method: 返回server_url／app_url／device_name／max_concurrent_tasks四项Set成功, scope: multica-runner的Multica连接参数已配置，尚未认证或启动daemon；不读取包含后续PAT的完整config文件}
   multica_server_codebuddy_login: {by: 用户明确确认及终端输出, date: "2026-10-30", method: 用户说明CodeBuddy登录成功并返回2.178.1交互界面及退出统计, scope: multica-runner下CodeBuddy认证按用户确认验收，输出API时长0s／token用量0／代码变更0；未由本地读取认证信息，Multica认证与daemon及真实任务仍未验收}
   multica_server_codex_login: {by: 用户执行输出, date: "2026-10-30", method: 返回Successfully_logged_in、Logged_in_using_ChatGPT及登录状态检查通过, scope: multica-runner下Codex账号认证阶段通过，未读取或转交凭据；CodeBuddy与Multica认证、daemon运行及任务执行仍未验收}
   multica_server_cli_installed: {by: 用户执行输出, date: "2026-10-30", method: 用户通过既有PC代理下载官方Linux包、固定SHA256校验后安装，返回版本及精确清理成功输出, scope: multica-runner下Multica_CLI0.7.2、commit_f05a525ac、linux/amd64安装检查通过；本段发行包／解压文件及任务目录已清理，认证与daemon未启动验收；不推定其他历史目录已清理}
@@ -715,7 +716,7 @@ services:
       version_scope: 已验证Desktop／daemon0.7.2连接后端0.7.1的认证、注册和WS基础链路，不代表全部功能跨版本兼容或后端已升级
       acceptance_pending: 明确任务目录和操作权限后验证实际任务执行及回传，继续接入其余已确定工具；Windows登录自启未单独核验
     server_runtime:
-      source: [multica_server_bootstrap, multica_initial_privilege_decision, multica_runner_sudo_acceptance, multica_server_agent_cli_installed, multica_server_cli_installed, multica_server_codex_login, multica_server_codebuddy_login]
+      source: [multica_server_bootstrap, multica_initial_privilege_decision, multica_runner_sudo_acceptance, multica_server_agent_cli_installed, multica_server_cli_installed, multica_server_codex_login, multica_server_codebuddy_login, multica_server_connection_configured]
       account: multica-runner
       uid: 1002
       gid: 1002
@@ -729,7 +730,8 @@ services:
       authentication: {codex: 用户输出确认已使用ChatGPT登录且状态检查通过, codebuddy: 用户明确确认登录成功且输出无模型调用, multica: 待验证}
       multica_cli: {version: 0.7.2, commit: f05a525ac, architecture: linux/amd64, path: /home/multica-runner/.local/bin/multica, source: 用户下载校验及版本输出}
       install_cleanup: {directory: /tmp/home-server-ops/multica-server-cli-20261030-01, state: 用户输出确认发行包与解压文件及本目录已清理, scope: 仅本段CLI安装临时目录}
-      state: 基础依赖／账号／sudo／三个CLI安装及Codex和CodeBuddy认证完成；Multica认证、daemon运行及自启尚未验收
+      multica_connection: {source: 用户设置成功输出, server_url: "http://127.0.0.1:13011", app_url: "https://multica.<DOMAIN>:4129", device_name: home-server, max_concurrent_tasks: 1}
+      state: 基础依赖／账号／sudo／三个CLI安装、两个Agent认证及Multica连接参数完成；Multica认证、daemon运行及自启尚未验收
     runtime_state: PC桌面端及Codex连接／登录／注册阶段通过，CodeBuddy安装／发现通过且登录已获用户确认；PC实际任务、Kimi及服务器daemon仍待验收
     cleanup: 用户已确认原multica-platform准备目录及两文件清理；multica-entry和multica-guard的入口配置用途已完成，达到清理条件，已交付精确文件及空目录删除命令；结果待用户确认，不等账号或runtime接入
 

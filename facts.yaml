@@ -1,6 +1,8 @@
 # 已记录的服务器快照，不代表持续监测；conventions 为运行规范，不代表实施结果。均不是可直接部署的配置。
-updated: "2026-10-27"
+updated: "2026-10-30"
 sources:
+  multica_scope_decision: {by: 用户, date: "2026-10-30", scope: 开始部署自托管Multica平台，服务器和Windows_PC均接daemon／运行时，计划接入Codex／CodeBuddy／Kimi，DeepSeek包装器为后续候选，尚未部署或验收}
+  multica_preflight: {by: 本地Codex, checked_at: "2026-10-30T16:46:51+08:00", method: SSH只读检查目标目录、可用资源、拟用端口及现行入口文件，核对官方v0.7.1部署资料与公开镜像manifest, scope: 三个目标目录未见存在、13010／13011未监听、内存及磁盘有余量；审查账号PATH未发现multica及编程CLI不等于其他账号未安装；平台文件仅本地准备，未在服务器执行}
   caddy_format_acceptance: {by: 用户执行、本地Codex独立复核, checked_at: "2026-10-27T21:48:41+08:00", pac_checked_at: "2026-10-27T21:50:15+08:00", method: 用户返回fmt／等价／两端回读和自动清理成功输出，本地SSH只读核对新哈希、inode／属主／权限、前后adapt等价及有效HTTP配置，并从本机直连读取PAC, scope: 新哈希fa6041cb…一致、格式警告消失、HTTP配置及PAC正文未变；临时脚本／副本／任务目录清理按用户输出接受，未独立遍历受限目录，未由本地修改或重载服务器}
   format_temporary_policy: {by: 用户要求、本地Codex审查, date: "2026-10-27", checked_at: "2026-10-27T21:34:50+08:00", method: SSH只读核对当前Caddyfile并调用仅转换的adapt接口，检查统一临时根目录元数据，参照Caddy官方fmt说明, scope: 当前格式警告仍在，转换成功且有效HTTP配置未变；临时根目录已存在为0700且非符号链接；新增格式与临时产物规范，格式修正仅准备命令尚未在服务器执行}
   wifi_pac_handoff: {by: 用户转交Web实施结果及确认, date: "2026-10-27", scope: 手机恢复DHCP并配置PAC后访问正常、三个服务经代理正常及未授权目标拒绝、配置校验与Caddy热重载、UFW仅LAN放行、八个临时文件及本轮目录清理按用户交接记录；笔记本及实际重启恢复未验收}
@@ -873,6 +875,11 @@ network:
 
 operations:
   source: [admin, user]
+  multica_rollout:
+    source: [multica_scope_decision, multica_preflight]
+    status: Planned，用户已选择启动，配置准备待服务器执行
+    preflight: {architecture: x86_64, available_memory_kib: 13599680, system_disk_free_gib: 860, intended_ports_unused: [13010, 13011]}
+    scope: 平台与两端运行时分阶段验收，具体参数和完成标准集中在progress.md任务08；不把本地候选记作已部署服务
   temporary_workspace:
     source: [format_temporary_policy]
     root: /tmp/home-server-ops

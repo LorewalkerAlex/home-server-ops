@@ -1,6 +1,6 @@
 # 项目进度
 
-更新：2026-10-27。仅记录已确定事项；本地 Codex 根据证据验收后勾选。服务器参数、运行与部署规范及核验来源见 [facts.yaml](facts.yaml)。
+更新：2026-10-30。仅记录已确定事项；本地 Codex 根据证据验收后勾选。服务器参数、运行与部署规范及核验来源见 [facts.yaml](facts.yaml)。
 
 ## 已完成
 
@@ -206,6 +206,16 @@
 - [ ] **08. AI 运维自动化**
 
   目标：让本地 AI 可重复获取服务器状态、辅助排障，并研究有控制机制的运维操作。
+
+  2026-10-30用户选择开始部署Multica，作为任务与Agent协作平台；自托管Web／API／PostgreSQL，服务器和Windows PC均需daemon及运行时。接入范围为Codex、CodeBuddy、Kimi，DeepSeek API包装器待后续评估；自动发现只覆盖daemon账号PATH内已安装的兼容CLI，安装、登录及权限需单独核验。
+
+  - [ ] **Multica自托管平台**：候选版本v0.7.1及三个镜像digest已核对，准备脚本尚待用户执行。部署`/srv/apps/multica/compose.yaml`，持久数据`/srv/persistent/data/multica/{postgres,uploads}`，私密配置`/srv/persistent/secrets/multica/platform.env`；Web仅127.0.0.1:13010、API仅127.0.0.1:13011，数据库不发布端口。拟用内网入口`https://multica.<DOMAIN>:4129`，Caddy／PAC和Squid需单独增加该服务，不开放公网。按配置准备、镜像拉取、启动、入口及登录分别操作；验收包括数据库健康、API /readyz、页面与WebSocket、创建账号和关闭新注册。不把配置校验记为运行成功。
+
+  - [ ] **服务器daemon与运行时**：专用账号和工作目录，明确可读写路径及授权操作后安装CLI／登录并注册运行时，验证任务在服务器执行、结果可回传及自启保持。角色Instructions不替代系统权限；不默认授予管理员账号、sudo或Docker socket，不把Multica自动应答当作人工授权。
+
+  - [ ] **Windows PC daemon与运行时**：接到同一自托管平台，核对实际执行账号、PATH及工具登录，注册所需CLI并验证PC端任务与回传；核对代理和平台地址可达性，分别标明已接入工具与待接入工具，不能以PC检测成功代替服务器接入。
+
+  约束：沿用部署、Caddy格式、登录Shell及临时目录规范。平台准备脚本与结果只放`/tmp/home-server-ops/multica-platform-20261030-01/`，平台阶段验收后精确清理，不等全部运行时完成；正式数据不作为临时文件清理。现有入口配置已较旧快照变化，接入前必须读取完整现行文件；私密配置及邮箱不公开。任务派发、验收和Git归档规则在平台可用后配置，不提前迁移或关闭其他任务。
 
   范围：评估自动采集、只读 HTTP 或其他数据提供方式，覆盖健康、容器、磁盘、日志和版本；探索日志分析、故障诊断、更新影响和维护建议，按需研究受控执行。
 

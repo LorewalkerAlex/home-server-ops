@@ -1,6 +1,8 @@
 # 已记录的服务器快照，不代表持续监测；conventions 为运行规范，不代表实施结果。均不是可直接部署的配置。
 updated: "2026-10-30"
 sources:
+  multica_server_bootstrap: {by: 用户执行输出、本地Codex只读复核账号, date: "2026-10-30", method: 用户返回Node/npm及账号创建成功输出，本地核对账号／组与sudo规则元数据、用visudo stdin只读校验拟用规则, scope: Node22.22.1及npm9.2.0按用户输出记录，multica-runner_UID/GID1002已创建；当前仅自身组，拟用sudo规则文件不存在，尚未授予sudo，三个CLI及daemon尚未验收}
+  multica_initial_privilege_decision: {by: 用户, date: "2026-10-30", scope: 初期服务器Agent需要足够权限及完整sudo能力，使用后再考虑按不同Agent分配权限；本地为无人值守提供免密sudo方案，尚待用户执行，不记录为已授权落地}
   multica_pc_codebuddy_login: {by: 用户, date: "2026-10-30", method: 明确回复PC_CodeBuddy已完成登录, scope: 按用户确认验收账号认证，不描述成本地独立检查；实际模型任务与结果回传尚未验证}
   multica_pc_codebuddy_installed: {by: 本地Codex, checked_at: "2026-10-30T20:14:56.575272+08:00", method: 查询官方npm_registry的latest并安装CodeBuddy_Code_CLI，核对实际版本、Desktop_daemon及后端runtime列表, scope: PC已安装2.178.1且Desktop自动发现、后端注册online；尚未确认CodeBuddy账号认证或执行模型任务，服务器安装仅完成只读预检和命令准备}
   multica_pc_online: {by: 用户登录及自动更新、本地Codex修正并独立复核, checked_at: "2026-10-30T19:24:34.776068+08:00", method: 安装官方稳定Codex CLI、核对登录状态，由Windows桌面重启后查询专属daemon及后端runtime，读取脱敏注册／WebSocket和心跳日志, scope: Desktop及daemon0.7.2、后端0.7.1，PC Codex0.166.0注册online且WS持续确认；只完成连接与注册阶段，未运行模型任务，CodeBuddy／Kimi和服务器daemon未验收，未修改服务器配置}
@@ -707,6 +709,17 @@ services:
       other_tools: Kimi未接入验收
       version_scope: 已验证Desktop／daemon0.7.2连接后端0.7.1的认证、注册和WS基础链路，不代表全部功能跨版本兼容或后端已升级
       acceptance_pending: 明确任务目录和操作权限后验证实际任务执行及回传，继续接入其余已确定工具；Windows登录自启未单独核验
+    server_runtime:
+      source: [multica_server_bootstrap, multica_initial_privilege_decision]
+      account: multica-runner
+      uid: 1002
+      gid: 1002
+      home: /home/multica-runner
+      node: {version: 22.22.1, source: 用户安装输出}
+      npm: {version: 9.2.0, source: 用户安装输出}
+      permission_state: 当前账号仅自身组，sudo授权待执行；不能把未加入sudo组单独当作无sudo的永久判断
+      permission_plan: 初期提供完整免密码sudo以便统一运维，后续按实际使用再考虑权限拆分；sudoers规则待用户安装并实测sudo -n
+      state: 基础依赖与账号准备完成；CLI安装／认证／daemon运行及自启尚未验收
     runtime_state: PC桌面端及Codex连接／登录／注册阶段通过，CodeBuddy安装／发现通过且登录已获用户确认；PC实际任务、Kimi及服务器daemon仍待验收
     cleanup: 用户已确认原multica-platform准备目录及两文件清理；multica-entry和multica-guard的入口配置用途已完成，达到清理条件，已交付精确文件及空目录删除命令；结果待用户确认，不等账号或runtime接入
 

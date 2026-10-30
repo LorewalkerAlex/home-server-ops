@@ -38,6 +38,8 @@
 
 - [x] **08 阶段：Multica基础容器与LAN入口配置**：2026-10-30用户部署v0.7.1并修正Caddy来源限制的执行顺序；本地独立核对数据库及迁移就绪、可信HTTPS／API和Squid访问正常，非LAN首页／API／WebSocket路径403，既有服务回归通过。原准备目录已按用户输出确认清理，两个入口临时目录已达到清理条件、结果待确认。账号登录、真实WebSocket、关闭新注册及两端runtime仍属于任务08未完成范围。
 
+- [x] **08 阶段：PC Desktop登录与Codex运行时连接**：2026-10-30用户确认登录并更新至0.7.2；本地修正独立CLI发现、确认Codex0.166.0已登录，由Windows桌面重开后daemon持续运行，后端确认Codex在线，认证WebSocket及心跳正常。只完成PC连接／注册阶段，实际任务、其他工具、Windows登录自启及服务器daemon仍待验收；后端保持0.7.1。
+
 ## 未完成
 
 以下为用户确认的路线图：01–10 于 2026-10-22 登记，11 于 2026-10-25 根据用户交接新增。编号仅用于识别，不代表优先级或执行顺序，具体任务由用户选择后开始。方案在任务开始时按真实环境确定；研究项以有依据的结论和决策为目标，不要求部署全部候选方案。依赖说明只限定相应环节，不替用户安排顺序。
@@ -211,11 +213,11 @@
 
   2026-10-30用户选择开始部署Multica，作为任务与Agent协作平台；自托管Web／API／PostgreSQL，服务器和Windows PC均需daemon及运行时。接入范围为Codex、CodeBuddy、Kimi，DeepSeek API包装器待后续评估；自动发现只覆盖daemon账号PATH内已安装的兼容CLI，安装、登录及权限需单独核验。
 
-  - [ ] **Multica自托管平台**：版本v0.7.1及三个镜像digest已核对；用户已完成配置准备、三个固定镜像拉取和容器启动；本地确认数据库／迁移就绪、Web200和回环绑定。用户已应用入口并修正LAN拒绝规则顺序；本地确认可信HTTPS／API及Squid访问通过，非LAN首页、API及WebSocket路径均403。基础容器与入口配置阶段完成，首次登录、真实WebSocket及关闭新注册待验收。部署`/srv/apps/multica/compose.yaml`，持久数据`/srv/persistent/data/multica/{postgres,uploads}`，私密配置`/srv/persistent/secrets/multica/platform.env`；Web仅127.0.0.1:13010、API仅127.0.0.1:13011，数据库不发布端口。内网入口`https://multica.<DOMAIN>:4129`，已加入Caddy／PAC和Squid，本次未新增公网站点。按配置准备、镜像拉取、启动、入口及登录分别操作；验收包括数据库健康、API /readyz、页面与WebSocket、创建账号和关闭新注册。不把配置校验记为运行成功。
+  - [ ] **Multica自托管平台**：版本v0.7.1及三个镜像digest已核对；用户已完成配置准备、三个固定镜像拉取和容器启动；本地确认数据库／迁移就绪、Web200和回环绑定。用户已应用入口并修正LAN拒绝规则顺序；本地确认可信HTTPS／API及Squid访问通过，非LAN首页、API及WebSocket路径均403。基础容器与入口配置阶段完成，用户已完成Desktop登录，本地确认PC daemon的认证WebSocket与持续心跳；关闭新注册及界面实时变更仍待验收。部署`/srv/apps/multica/compose.yaml`，持久数据`/srv/persistent/data/multica/{postgres,uploads}`，私密配置`/srv/persistent/secrets/multica/platform.env`；Web仅127.0.0.1:13010、API仅127.0.0.1:13011，数据库不发布端口。内网入口`https://multica.<DOMAIN>:4129`，已加入Caddy／PAC和Squid，本次未新增公网站点。按配置准备、镜像拉取、启动、入口及登录分别操作；验收包括数据库健康、API /readyz、页面与WebSocket、创建账号和关闭新注册。不把配置校验记为运行成功。
 
   - [ ] **服务器daemon与运行时**：专用账号和工作目录，明确可读写路径及授权操作后安装CLI／登录并注册运行时，验证任务在服务器执行、结果可回传及自启保持。角色Instructions不替代系统权限；不默认授予管理员账号、sudo或Docker socket，不把Multica自动应答当作人工授权。
 
-  - [ ] **Windows PC daemon与运行时**：用户已安装Desktop0.7.1，本地已配置自托管地址、启动应用并确认独立profile和后端可信HTTPS200；当前daemon为stopped，等待用户登录后验证桌面端自动管理的daemon和工具检测。当前会话PATH找到Codex，CodeBuddy／Kimi未找到，不作为桌面端接入成功。后续核对实际执行账号、PATH及工具登录，注册所需CLI并验证PC端任务与回传；桌面端使用自己的profile，不额外启动重复CLI daemon。分别标明已接入工具与待接入工具，不能以PC检测成功代替服务器接入。
+  - [ ] **Windows PC daemon与运行时**：用户已登录并自动更新Desktop至0.7.2；本地修正持久CLI发现，安装官方Codex0.166.0至既有Node目录，确认ChatGPT登录。由Windows桌面重开后，Desktop管理的daemon0.7.2运行，后端0.7.1确认Codex runtime为online，认证WebSocket及持续心跳通过；仅完成连接／登录／注册阶段，未运行模型任务。明确任务目录和操作权限后验证实际执行及回传，继续核对CodeBuddy／Kimi的安装、登录和接入；Windows登录自启未单独核验。桌面端使用独立profile，不额外启动重复CLI daemon；Node版本切换后重新核对CLI发现。PC结果不替代服务器接入。
 
   约束：沿用部署、Caddy格式、登录Shell及临时目录规范。准备目录`/tmp/home-server-ops/multica-platform-20261030-01/`已按用户成功输出确认清理；入口目录`/tmp/home-server-ops/multica-entry-20261030-01/`和修正目录`/tmp/home-server-ops/multica-guard-20261030-01/`已完成用途，本轮交付精确清理命令、等待用户结果；不等账号或运行时接入；正式数据不作为临时文件清理。现有入口配置已较旧快照变化，接入前必须读取完整现行文件；私密配置及邮箱不公开。任务派发、验收和Git归档规则在平台可用后配置，不提前迁移或关闭其他任务。
 

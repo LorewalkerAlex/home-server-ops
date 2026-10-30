@@ -1,6 +1,7 @@
 # 已记录的服务器快照，不代表持续监测；conventions 为运行规范，不代表实施结果。均不是可直接部署的配置。
 updated: "2026-10-30"
 sources:
+  multica_pc_desktop_setup: {by: 用户安装、本地Codex配置并独立核对, checked_at: "2026-10-30T18:11:40.110801+08:00", method: 核对PC安装版本、写入并回读桌面端desktop.json，启动应用并查询其独立profile状态，正常DNS下访问后端HTTPS, scope: Desktop0.7.1已连接自托管配置并生成独立profile，health与api/config均200；查询时daemon为stopped，登录及实际任务尚未验收，未读取凭据或另起CLI daemon}
   multica_guard_acceptance: {by: 用户应用、本地Codex独立复核, checked_at: "2026-10-30T17:57:22.663142+08:00", client_checked_at: "2026-10-30T17:57:25.923813+08:00", method: 回读正式Caddyfile及生效HTTP配置，核对拒绝顺序并实测LAN／非LAN访问，Windows直连和Squid回归, scope: Caddy哈希与用户一致、无格式警告、LAN拒绝先于所有Multica代理；非LAN首页／health／ws及其子路径均403，LAN页面及API200且证书有效，Squid及旧三个服务正常；只完成入口配置阶段，两个临时目录清理、账号登录和真实WebSocket未确认}
   multica_entry_review: {by: 用户应用、本地Codex独立复核, checked_at: "2026-10-30T17:48:59.207901+08:00", client_checked_at: "2026-10-30T17:48:58.874313+08:00", method: 回读正式文件及有效HTTP路由，Windows直连及Squid隧道访问，PAC离线检查与服务器非LAN来源实测, scope: HTTPS及API为200且证书有效、代理允许及未授权目标拒绝、旧三个服务回归正常；发现Multica的handle先于LAN拒绝规则执行，回环来源访问该站点返回200，来源限制未通过；修正候选已验证但尚未应用，登录和真实WebSocket未验收}
   multica_preparation_cleanup: {by: 用户, date: "2026-10-30", method: 返回精确删除两文件及rmdir成功输出, scope: multica-platform-20261030-01准备目录已清理；不代表入口目录已清理，不描述成本地删除或独立遍历}
@@ -672,7 +673,18 @@ services:
       lan_guard: Passed；route内先执行lan_only再分流WebSocket和Web，生效路由顺序已独立核对；服务器127.0.0.1来源访问首页／health／ws及其子路径均403，PC的LAN访问200
       public_route: 本次未创建Multica公网443站点
     access_pending: 使用准备时指定的邮箱首次登录，验证真实WebSocket，再关闭新注册；这些步骤尚未完成
-    runtime_state: 服务器与PC的daemon及Codex／CodeBuddy／Kimi接入均未验收，安装及登录按各账号单独核对
+    pc_desktop:
+      source: [multica_pc_desktop_setup]
+      version: 0.7.1
+      config: "%USERPROFILE%/.multica/desktop.json"
+      schema_version: 1
+      api_url: https://multica.<DOMAIN>:4129
+      encoding: UTF-8无BOM
+      profile: 桌面端为该域名及端口创建独立desktop profile，保留既有Cloud profile，未复用终端默认profile
+      state: 已启动应用并确认自托管配置生效；查询时daemon为stopped，等待用户登录
+      cli_path_observation: 当前Codex会话PATH能找到Codex，未找到CodeBuddy或Kimi；不代表桌面端已检测或工具已登录
+      acceptance_pending: 用户登录后核对桌面端管理的daemon、工具检测、运行时注册和任务回传
+    runtime_state: PC桌面端安装与自托管连接配置已完成；两端daemon和Codex／CodeBuddy／Kimi的登录、注册与执行仍未验收
     cleanup: 用户已确认原multica-platform准备目录及两文件清理；multica-entry和multica-guard的入口配置用途已完成，达到清理条件，已交付精确文件及空目录删除命令；结果待用户确认，不等账号或runtime接入
 
   squid:

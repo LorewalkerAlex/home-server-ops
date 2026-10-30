@@ -1,6 +1,7 @@
 # 已记录的服务器快照，不代表持续监测；conventions 为运行规范，不代表实施结果。均不是可直接部署的配置。
 updated: "2026-10-30"
 sources:
+  multica_started: {by: 用户启动、本地Codex独立复核, checked_at: "2026-10-30T17:10:06.623091+08:00", method: 用户返回三个固定镜像Pulled及compose启动Healthy，本地SSH只读核对回环HTTP／readyz和端口并读取当前入口配置, scope: 数据库和迁移均ok、Web200、端口仅回环，后端commit与v0.7.1一致；未调用Docker_API或读取凭据，HTTPS／登录／WebSocket和两端runtime未验收}
   multica_prepared: {by: 用户执行、本地Codex独立回读, checked_at: "2026-10-30T17:01:00.102397+08:00", method: 用户返回prepared及Compose静默校验成功，本地SSH只读核对正式Compose和README, scope: Compose哈希6e60e750…与审查候选一致、文件0644；私密文件未读取，镜像未拉取、容器未启动，不把准备完成当平台可用}
   multica_scope_decision: {by: 用户, date: "2026-10-30", scope: 开始部署自托管Multica平台，服务器和Windows_PC均接daemon／运行时，计划接入Codex／CodeBuddy／Kimi，DeepSeek包装器为后续候选，尚未部署或验收}
   multica_preflight: {by: 本地Codex, checked_at: "2026-10-30T16:46:51+08:00", method: SSH只读检查目标目录、可用资源、拟用端口及现行入口文件，核对官方v0.7.1部署资料与公开镜像manifest, scope: 三个目标目录未见存在、13010／13011未监听、内存及磁盘有余量；审查账号PATH未发现multica及编程CLI不等于其他账号未安装；平台文件仅本地准备，未在服务器执行}
@@ -519,7 +520,8 @@ services:
     caddyfile_sites: ["https://<TUDUDI_FQDN>", "https://<TUDUDI_FQDN>:4129", "http://<TUDUDI_FQDN>", "http://192.168.1.110", "https://crawlab.<DOMAIN>:4129", "https://beszel.<DOMAIN>:4129"]
     ingress_review:
       source: [caddy_applied_handoff, caddy_applied_review, ufw_4129_handoff, lan_4129_review, caddy_backup_exit_review, caddy_rollback_cleanup_review, wifi_pac_handoff, wifi_pac_review, caddy_format_acceptance]
-      current_file_sha256: fa6041cbdb901206dbc333771ad962554831d91ce94b3a6e7979b725072a5b8b
+      current_file_sha256: 97a11689ac8c97e2b3bbb7b362fe069b4657c98a4f8b12d0840c0dd44cfcd774
+      current_file_observation: {source: [multica_started], scope: 10月30日读取的文件包含其他会话后续修改，本轮仅作为Multica接入基线，未逐项验收其他变更；旧格式及路由验收结论只适用于其来源时点}
       formatting:
         source: [format_temporary_policy, caddy_format_acceptance]
         status: Passed
@@ -621,6 +623,40 @@ services:
       not_after: "2027-01-20T08:07:01Z"
       https_http_status: 200
       renewal: Caddy 自动管理；本轮验证配置及当前证书，不声称已跨续期周期观察
+
+  multica:
+    source:
+    - multica_scope_decision
+    - multica_prepared
+    - multica_started
+    deployment: Docker Compose，自托管Web／API／独立PostgreSQL
+    version: v0.7.1
+    compose: /srv/apps/multica/compose.yaml
+    compose_sha256: 6e60e750510d428f707a5070099fa94a655e1994df1a5e11a14a31e1686ecaa7
+    private_env: /srv/persistent/secrets/multica/platform.env
+    state: 基础容器运行，HTTP回环阶段通过，平台整体未验收
+    images:
+      postgres: pgvector/pgvector:pg17@sha256:ac08538c6f8b9904c33c8224c5e5706dbe760aca29db1d096972b4052c22a75d
+      backend: ghcr.io/multica-ai/multica-backend:v0.7.1@sha256:36dd6d2325b5bb6b6873ef7ee19e0a15a084832771a68bdc2b50b0990a6eba38
+      frontend: ghcr.io/multica-ai/multica-web:v0.7.1@sha256:a474b3874e2de19b9019a2b07ec07c22247ecc61f0f39fb6cf4d814504aaf316
+    ports:
+      frontend: 127.0.0.1:13010 -> 3000/tcp
+      backend: 127.0.0.1:13011 -> 8080/tcp
+      postgres: 无宿主端口
+    persistence:
+      postgres: /srv/persistent/data/multica/postgres -> /var/lib/postgresql/data
+      uploads: /srv/persistent/data/multica/uploads -> /app/data/uploads
+    restart: unless-stopped
+    startup_user_reported: 三个容器均Healthy，使用固定digest拉取并up --wait通过；不描述成本地Docker API检查
+    readiness_local:
+      http_status: 200
+      db: ok
+      migrations: ok
+      backend_commit: aec9b0b1699939a6d993da9ca2ebd2c62900a8e0
+      web_http_status: 200
+    access_pending: 拟用LAN https://multica.<DOMAIN>:4129；站点／WebSocket路由／PAC和Squid追加候选已准备，用户尚未应用
+    runtime_state: 服务器与PC的daemon及Codex／CodeBuddy／Kimi接入均未验收，安装及登录按各账号单独核对
+    cleanup: 配置准备及基础启动已通过，原准备目录的脚本与结果已达到清理条件；新入口任务目录在该阶段验收后退出，不等runtime接入
 
   squid:
     source:
@@ -877,13 +913,13 @@ network:
 operations:
   source: [admin, user]
   multica_rollout:
-    source: [multica_scope_decision, multica_preflight, multica_prepared]
-    status: Prepared，配置已创建并通过校验，镜像拉取与容器启动待执行
+    source: [multica_scope_decision, multica_preflight, multica_prepared, multica_started]
+    status: Running on loopback，镜像已拉取且基础容器启动通过，HTTPS／登录及两端runtime待验收
     compose: /srv/apps/multica/compose.yaml
     compose_sha256: 6e60e750510d428f707a5070099fa94a655e1994df1a5e11a14a31e1686ecaa7
     private_env: /srv/persistent/secrets/multica/platform.env
     preflight: {architecture: x86_64, available_memory_kib: 13599680, system_disk_free_gib: 860, intended_ports_unused: [13010, 13011]}
-    scope: 平台与两端运行时分阶段验收，具体参数和完成标准集中在progress.md任务08；当前仅配置准备阶段，不把声明或配置校验记作平台运行成功
+    scope: 平台与两端运行时分阶段验收，具体参数和完成标准集中在progress.md任务08；基础回环启动已通过，不代表HTTPS入口、账号或Agent链路已经可用
   temporary_workspace:
     source: [format_temporary_policy]
     root: /tmp/home-server-ops

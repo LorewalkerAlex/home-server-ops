@@ -1,6 +1,8 @@
 # 已记录的服务器快照，不代表持续监测；conventions 为运行规范，不代表实施结果。均不是可直接部署的配置。
 updated: "2026-10-30"
 sources:
+  multica_entry_review: {by: 用户应用、本地Codex独立复核, checked_at: "2026-10-30T17:48:59.207901+08:00", client_checked_at: "2026-10-30T17:48:58.874313+08:00", method: 回读正式文件及有效HTTP路由，Windows直连及Squid隧道访问，PAC离线检查与服务器非LAN来源实测, scope: HTTPS及API为200且证书有效、代理允许及未授权目标拒绝、旧三个服务回归正常；发现Multica的handle先于LAN拒绝规则执行，回环来源访问该站点返回200，来源限制未通过；修正候选已验证但尚未应用，登录和真实WebSocket未验收}
+  multica_preparation_cleanup: {by: 用户, date: "2026-10-30", method: 返回精确删除两文件及rmdir成功输出, scope: multica-platform-20261030-01准备目录已清理；不代表入口目录已清理，不描述成本地删除或独立遍历}
   multica_started: {by: 用户启动、本地Codex独立复核, checked_at: "2026-10-30T17:10:06.623091+08:00", method: 用户返回三个固定镜像Pulled及compose启动Healthy，本地SSH只读核对回环HTTP／readyz和端口并读取当前入口配置, scope: 数据库和迁移均ok、Web200、端口仅回环，后端commit与v0.7.1一致；未调用Docker_API或读取凭据，HTTPS／登录／WebSocket和两端runtime未验收}
   multica_prepared: {by: 用户执行、本地Codex独立回读, checked_at: "2026-10-30T17:01:00.102397+08:00", method: 用户返回prepared及Compose静默校验成功，本地SSH只读核对正式Compose和README, scope: Compose哈希6e60e750…与审查候选一致、文件0644；私密文件未读取，镜像未拉取、容器未启动，不把准备完成当平台可用}
   multica_scope_decision: {by: 用户, date: "2026-10-30", scope: 开始部署自托管Multica平台，服务器和Windows_PC均接daemon／运行时，计划接入Codex／CodeBuddy／Kimi，DeepSeek包装器为后续候选，尚未部署或验收}
@@ -517,11 +519,11 @@ services:
     compose: /srv/apps/caddy/compose.yaml
     http_port: 80
     https_port: 443
-    caddyfile_sites: ["https://<TUDUDI_FQDN>", "https://<TUDUDI_FQDN>:4129", "http://<TUDUDI_FQDN>", "http://192.168.1.110", "https://crawlab.<DOMAIN>:4129", "https://beszel.<DOMAIN>:4129"]
+    caddyfile_sites: ["https://<TUDUDI_FQDN>", "https://<TUDUDI_FQDN>:4129", "http://<TUDUDI_FQDN>", "http://192.168.1.110", "https://crawlab.<DOMAIN>:4129", "https://beszel.<DOMAIN>:4129", "https://multica.<DOMAIN>:4129"]
     ingress_review:
       source: [caddy_applied_handoff, caddy_applied_review, ufw_4129_handoff, lan_4129_review, caddy_backup_exit_review, caddy_rollback_cleanup_review, wifi_pac_handoff, wifi_pac_review, caddy_format_acceptance]
-      current_file_sha256: 97a11689ac8c97e2b3bbb7b362fe069b4657c98a4f8b12d0840c0dd44cfcd774
-      current_file_observation: {source: [multica_started], scope: 10月30日读取的文件包含其他会话后续修改，本轮仅作为Multica接入基线，未逐项验收其他变更；旧格式及路由验收结论只适用于其来源时点}
+      current_file_sha256: 23135aeeed3bb79af3161aecfd60cfba0026e868cfd8f51a3ab666738a20b7e9
+      current_file_observation: {source: [multica_entry_review], scope: 用户已应用Multica入口且生效HTTP路由与文件一致、adapt无格式警告；LAN来源限制因执行顺序未通过，修正待应用；文件还包含其他会话后续修改，未逐项验收其他变更}
       formatting:
         source: [format_temporary_policy, caddy_format_acceptance]
         status: Passed
@@ -582,17 +584,19 @@ services:
         - wifi_pac_handoff
         - wifi_pac_review
         - caddy_format_acceptance
+        - multica_entry_review
         url: http://192.168.1.110/proxy.pac
         storage: JavaScript内嵌正式Caddyfile的respond块，无独立PAC文件
         allowed_source: 192.168.1.0/24
         observed_http_status: 200
         content_type: application/x-ns-proxy-autoconfig
         cache_control: no-store
-        served_body_sha256: de3f5e731a180638d30212eba99b8863f161b9142a6b83e1035dcf039e99f915
+        served_body_sha256: 32623d6200af46bbc9fe622e1addf27fef472b6015096182c7cb9dde53cc143a
         proxy_hosts:
         - tududi.<DOMAIN>
         - crawlab.<DOMAIN>
         - beszel.<DOMAIN>
+        - multica.<DOMAIN>
         proxy_result: PROXY 192.168.1.110:18128
         other_hosts_result: DIRECT
         scope: PAC按完整主机名分流，先转小写，不检查URL端口；CONNECT的4129限制由Squid执行。仅对使用PAC的客户端流量有效，未来新服务不会自动纳入
@@ -629,6 +633,8 @@ services:
     - multica_scope_decision
     - multica_prepared
     - multica_started
+    - multica_entry_review
+    - multica_preparation_cleanup
     deployment: Docker Compose，自托管Web／API／独立PostgreSQL
     version: v0.7.1
     compose: /srv/apps/multica/compose.yaml
@@ -654,14 +660,24 @@ services:
       migrations: ok
       backend_commit: aec9b0b1699939a6d993da9ca2ebd2c62900a8e0
       web_http_status: 200
-    access_pending: 拟用LAN https://multica.<DOMAIN>:4129；站点／WebSocket路由／PAC和Squid追加候选已准备，用户尚未应用
+    entry:
+      url: https://multica.<DOMAIN>:4129
+      bind: 192.168.1.110:4129
+      web_upstream: 127.0.0.1:13010
+      websocket: /ws及/ws/*直达127.0.0.1:13011，flush_interval为-1
+      http_tls: Windows直连和Squid隧道均为可信HTTPS200，/health及/api/config可用
+      websocket_limit: 未认证探测经Caddy及Squid与后端均返回相同400，只确认到达后端，不作为登录后WebSocket成功的证据
+      lan_guard: Failed；Caddy将handle排在lan_only的respond之前，服务器从127.0.0.1访问该LAN站点仍为200；修正为route内先拒绝后代理的候选已通过实际转换检查，尚未应用
+      public_route: 本次未创建Multica公网443站点
+    access_pending: 先修正LAN来源限制并实测拒绝，再进行账号登录、真实WebSocket及关闭新注册验收
     runtime_state: 服务器与PC的daemon及Codex／CodeBuddy／Kimi接入均未验收，安装及登录按各账号单独核对
-    cleanup: 配置准备及基础启动已通过，原准备目录的脚本与结果已达到清理条件；新入口任务目录在该阶段验收后退出，不等runtime接入
+    cleanup: 用户已确认原multica-platform准备目录及两文件清理；multica-entry与待上传的multica-guard目录在来源限制修正和入口复核后精确清理，不等账号或runtime接入；当前尚未确认清理
 
   squid:
     source:
     - wifi_pac_handoff
     - wifi_pac_review
+    - multica_entry_review
     purpose: 为支持PAC的家庭Wi-Fi客户端提供受限CONNECT代理，使用服务器DNS访问既有内网HTTPS入口
     deployment: Ubuntu软件包及systemd服务，非Docker容器
     package: squid 7.7-0ubuntu0.26.04.1
@@ -673,7 +689,7 @@ services:
     config: /etc/squid/squid.conf
     restricted_config: /etc/squid/conf.d/home-server-pac.conf
     config_sha256: af37e3badebaeb46ffc734662399fae558c7cba2269dc771dabce2f094acd164
-    restricted_config_sha256: 1e8ea88fea8c657fd71915d8d2d6d5112101b3ee0938894c1e3a3a9f3fd71d5b
+    restricted_config_sha256: 681645d646114ebd0af1a995c1db75aa2a84f64ffc9296367f1318c5bb7a840a
     listen:
       address: 192.168.1.110
       port: 18128
@@ -689,6 +705,7 @@ services:
       - tududi.<DOMAIN>
       - crawlab.<DOMAIN>
       - beszel.<DOMAIN>
+      - multica.<DOMAIN>
       host_match: dstdom_regex使用首尾锚点及转义点，忽略大小写，非子域通配
       destination_ip: 192.168.1.110
       destination_port: 4129
@@ -700,7 +717,7 @@ services:
       http_access: https://www.squid-cache.org/Doc/config/http_access/
       dns_nameservers: https://www.squid-cache.org/Doc/config/dns_nameservers/
     acceptance:
-      local_verified: 正式文件、全部当前conf.d片段、限定监听、active及enabled，PAC有效路由和本机HTTP响应；不由本地重跑代理业务测试
+      local_verified: 10月27日已核对正式文件及监听；10月30日追加Multica后独立核对片段、active／enabled、PAC九项分流，实际CONNECT访问Multica可信HTTPS200、外部域名及错误端口403
       user_reported: Squid配置检查和ACL测试通过，三个服务经代理正常，未授权目标拒绝，LAN UFW放行及手机PAC访问正常
       limits: Windows Wi-Fi笔记本未开始；开机启用已确认，实际重启恢复尚未测试
     temporary_cleanup:
@@ -824,7 +841,7 @@ network:
     reusable_goal: 后续获准 Web 服务沿用每服务子域名及内外网统一 4129 入口，Tududi 首项验收；扩容规则见 conventions.network.web_ingress
     user_reported_constraints: 路由器不能NAT回环或本地DNS；固定有线台式机已验收，手机改用DHCP和Wi-Fi PAC并已通过；笔记本待设备可用后测试
     acceptance_scope: 服务器Split DNS、有线台式机及手机PAC阶段已验收；笔记本兼容性／切网测试未完成，原LAN HTTP入口保留
-    implementation: dnsmasq保留既有子域名Split DNS供直接客户端及Squid使用；手机DHCP取得网络配置，由PAC将三个服务送至LAN Squid，再连接Caddy LAN4129；其余主机名DIRECT，详见services.squid及services.caddy.routes.lan_pac
+    implementation: dnsmasq保留既有子域名Split DNS供直接客户端及Squid使用；手机DHCP取得网络配置，由PAC将已明确列入清单的服务送至LAN Squid，再连接Caddy LAN4129；其余主机名DIRECT，详见services.squid及services.caddy.routes.lan_pac
     lan_https: Caddy 已新增192.168.1.110:4129并限制LAN来源；精确UFW放行后Windows直连返回可信HTTPS200，既有公网映射未改
     execution: 服务器Caddy／DNS／Squid及固定台式机、手机阶段完成；笔记本仅待客户端验收，不预设重新部署服务器。重启恢复未实测，不因客户端后续测试延长本轮临时副本保留
     details: Wi-Fi终端剩余任务、验收及清理见progress.md任务11；既有服务器与台式机事实按本文件复用
@@ -913,13 +930,13 @@ network:
 operations:
   source: [admin, user]
   multica_rollout:
-    source: [multica_scope_decision, multica_preflight, multica_prepared, multica_started]
-    status: Running on loopback，镜像已拉取且基础容器启动通过，HTTPS／登录及两端runtime待验收
+    source: [multica_scope_decision, multica_preflight, multica_prepared, multica_started, multica_entry_review, multica_preparation_cleanup]
+    status: Running，HTTPS入口可用但LAN来源限制未通过，修正待应用；登录及两端runtime未验收
     compose: /srv/apps/multica/compose.yaml
     compose_sha256: 6e60e750510d428f707a5070099fa94a655e1994df1a5e11a14a31e1686ecaa7
     private_env: /srv/persistent/secrets/multica/platform.env
     preflight: {architecture: x86_64, available_memory_kib: 13599680, system_disk_free_gib: 860, intended_ports_unused: [13010, 13011]}
-    scope: 平台与两端运行时分阶段验收，具体参数和完成标准集中在progress.md任务08；基础回环启动已通过，不代表HTTPS入口、账号或Agent链路已经可用
+    scope: 平台与两端运行时分阶段验收，具体参数和完成标准集中在progress.md任务08；HTTPS及代理路径技术检查已通过，LAN拒绝规则须先修正，不将可访问等同完整入口或平台验收
   temporary_workspace:
     source: [format_temporary_policy]
     root: /tmp/home-server-ops
@@ -1003,6 +1020,7 @@ conventions:
       boundaries: 所有 LAN 4129 站点使用一致的 LAN 绑定及来源限制；没有公网 DNS 记录不构成访问控制，不配置通配兜底业务代理
       upstreams: host 网络 Caddy 使用唯一、无冲突的 127.0.0.1 宿主机上游端口；不为每项 Web 服务另开公网端口
       layout: 当前保留单个 Caddyfile，使用公共片段及每服务上游片段；服务增加时添加明确站点，不预建未部署服务的路由
+      handler_order: 来源限制与handle／handle_path共存时，必须核对adapt后的实际处理顺序；必要时在route内先拒绝再分流，不能只凭Caddyfile文字顺序或出现lan_only判断有效。部署后实际验证允许来源成功和非允许来源403，覆盖首页、API及WebSocket路径
       tls: AliDNS DNS-01 在全局 acme_dns 统一配置，凭据仍引用既有环境变量；同一域名不同端口共用证书，不重复定义冲突策略，不启用按需签发
       redirects: 保留自动证书管理，仅禁用自动 HTTP 跳转；需要的域名跳转显式指向 https://主机名:4129 并保留 URI，不开放公网 80
       protocols: 当前按 TCP 链路规划 h1/h2，不额外监听或映射 HTTP/3 的 UDP；以后确有需求再核对 UDP 转发及通告端口
@@ -1016,6 +1034,7 @@ conventions:
         snippets: https://caddyserver.com/docs/caddyfile/directives/import
         binding: https://caddyserver.com/docs/caddyfile/directives/bind
         conversion: https://caddyserver.com/docs/api#post-adapt
+        route_order: https://caddyserver.com/docs/caddyfile/directives/route
     firewall:
       - 不仅凭 UFW 默认拒绝或链的默认 DROP 判断容器端口安全；还需检查提前 ACCEPT、NAT、实际转发及访问路径
       - iptables 的 nf_tables API 与 Docker 原生 nftables 后端是不同概念，规则检查方法须与实际后端相符

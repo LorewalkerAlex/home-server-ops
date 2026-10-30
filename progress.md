@@ -209,13 +209,13 @@
 
   2026-10-30用户选择开始部署Multica，作为任务与Agent协作平台；自托管Web／API／PostgreSQL，服务器和Windows PC均需daemon及运行时。接入范围为Codex、CodeBuddy、Kimi，DeepSeek API包装器待后续评估；自动发现只覆盖daemon账号PATH内已安装的兼容CLI，安装、登录及权限需单独核验。
 
-  - [ ] **Multica自托管平台**：版本v0.7.1及三个镜像digest已核对；用户已完成配置准备、三个固定镜像拉取和容器启动；本地确认数据库／迁移就绪、Web200和回环绑定。内网HTTPS、登录及WebSocket尚未验收，入口候选已准备。部署`/srv/apps/multica/compose.yaml`，持久数据`/srv/persistent/data/multica/{postgres,uploads}`，私密配置`/srv/persistent/secrets/multica/platform.env`；Web仅127.0.0.1:13010、API仅127.0.0.1:13011，数据库不发布端口。拟用内网入口`https://multica.<DOMAIN>:4129`，Caddy／PAC和Squid需单独增加该服务，不开放公网。按配置准备、镜像拉取、启动、入口及登录分别操作；验收包括数据库健康、API /readyz、页面与WebSocket、创建账号和关闭新注册。不把配置校验记为运行成功。
+  - [ ] **Multica自托管平台**：版本v0.7.1及三个镜像digest已核对；用户已完成配置准备、三个固定镜像拉取和容器启动；本地确认数据库／迁移就绪、Web200和回环绑定。用户已应用入口且HTTPS／API及Squid访问通过；本地发现Caddy的handle先于LAN拒绝规则执行，回环来源访问仍为200，须先应用已验证的route顺序修正。登录及真实WebSocket未验收。部署`/srv/apps/multica/compose.yaml`，持久数据`/srv/persistent/data/multica/{postgres,uploads}`，私密配置`/srv/persistent/secrets/multica/platform.env`；Web仅127.0.0.1:13010、API仅127.0.0.1:13011，数据库不发布端口。内网入口`https://multica.<DOMAIN>:4129`，已加入Caddy／PAC和Squid，本次未新增公网站点。按配置准备、镜像拉取、启动、入口及登录分别操作；验收包括数据库健康、API /readyz、页面与WebSocket、创建账号和关闭新注册。不把配置校验记为运行成功。
 
   - [ ] **服务器daemon与运行时**：专用账号和工作目录，明确可读写路径及授权操作后安装CLI／登录并注册运行时，验证任务在服务器执行、结果可回传及自启保持。角色Instructions不替代系统权限；不默认授予管理员账号、sudo或Docker socket，不把Multica自动应答当作人工授权。
 
   - [ ] **Windows PC daemon与运行时**：接到同一自托管平台，核对实际执行账号、PATH及工具登录，注册所需CLI并验证PC端任务与回传；核对代理和平台地址可达性，分别标明已接入工具与待接入工具，不能以PC检测成功代替服务器接入。
 
-  约束：沿用部署、Caddy格式、登录Shell及临时目录规范。准备目录`/tmp/home-server-ops/multica-platform-20261030-01/`的脚本与结果已达到清理条件；入口候选／日志／临时回退副本集中在`/tmp/home-server-ops/multica-entry-20261030-01/`，该入口阶段验收后精确清理，不等全部运行时完成；正式数据不作为临时文件清理。现有入口配置已较旧快照变化，接入前必须读取完整现行文件；私密配置及邮箱不公开。任务派发、验收和Git归档规则在平台可用后配置，不提前迁移或关闭其他任务。
+  约束：沿用部署、Caddy格式、登录Shell及临时目录规范。准备目录`/tmp/home-server-ops/multica-platform-20261030-01/`已按用户成功输出确认清理；入口目录`/tmp/home-server-ops/multica-entry-20261030-01/`与待上传修正目录`/tmp/home-server-ops/multica-guard-20261030-01/`在LAN拒绝实测通过及入口复核后精确清理，不等账号或运行时接入；正式数据不作为临时文件清理。现有入口配置已较旧快照变化，接入前必须读取完整现行文件；私密配置及邮箱不公开。任务派发、验收和Git归档规则在平台可用后配置，不提前迁移或关闭其他任务。
 
   范围：评估自动采集、只读 HTTP 或其他数据提供方式，覆盖健康、容器、磁盘、日志和版本；探索日志分析、故障诊断、更新影响和维护建议，按需研究受控执行。
 

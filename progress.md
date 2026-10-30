@@ -209,7 +209,7 @@
 
   2026-10-30用户选择开始部署Multica，作为任务与Agent协作平台；自托管Web／API／PostgreSQL，服务器和Windows PC均需daemon及运行时。接入范围为Codex、CodeBuddy、Kimi，DeepSeek API包装器待后续评估；自动发现只覆盖daemon账号PATH内已安装的兼容CLI，安装、登录及权限需单独核验。
 
-  - [ ] **Multica自托管平台**：候选版本v0.7.1及三个镜像digest已核对，准备脚本尚待用户执行。部署`/srv/apps/multica/compose.yaml`，持久数据`/srv/persistent/data/multica/{postgres,uploads}`，私密配置`/srv/persistent/secrets/multica/platform.env`；Web仅127.0.0.1:13010、API仅127.0.0.1:13011，数据库不发布端口。拟用内网入口`https://multica.<DOMAIN>:4129`，Caddy／PAC和Squid需单独增加该服务，不开放公网。按配置准备、镜像拉取、启动、入口及登录分别操作；验收包括数据库健康、API /readyz、页面与WebSocket、创建账号和关闭新注册。不把配置校验记为运行成功。
+  - [ ] **Multica自托管平台**：版本v0.7.1及三个镜像digest已核对；用户已完成配置准备及Compose静默校验，本地回读正式Compose哈希与候选一致。镜像拉取、启动及入口尚未执行。部署`/srv/apps/multica/compose.yaml`，持久数据`/srv/persistent/data/multica/{postgres,uploads}`，私密配置`/srv/persistent/secrets/multica/platform.env`；Web仅127.0.0.1:13010、API仅127.0.0.1:13011，数据库不发布端口。拟用内网入口`https://multica.<DOMAIN>:4129`，Caddy／PAC和Squid需单独增加该服务，不开放公网。按配置准备、镜像拉取、启动、入口及登录分别操作；验收包括数据库健康、API /readyz、页面与WebSocket、创建账号和关闭新注册。不把配置校验记为运行成功。
 
   - [ ] **服务器daemon与运行时**：专用账号和工作目录，明确可读写路径及授权操作后安装CLI／登录并注册运行时，验证任务在服务器执行、结果可回传及自启保持。角色Instructions不替代系统权限；不默认授予管理员账号、sudo或Docker socket，不把Multica自动应答当作人工授权。
 

@@ -1,6 +1,7 @@
 # 已记录的服务器快照，不代表持续监测；conventions 为运行规范，不代表实施结果。均不是可直接部署的配置。
 updated: "2026-10-30"
 sources:
+  multica_pc_codebuddy_installed: {by: 本地Codex, checked_at: "2026-10-30T20:14:56.575272+08:00", method: 查询官方npm_registry的latest并安装CodeBuddy_Code_CLI，核对实际版本、Desktop_daemon及后端runtime列表, scope: PC已安装2.178.1且Desktop自动发现、后端注册online；尚未确认CodeBuddy账号认证或执行模型任务，服务器安装仅完成只读预检和命令准备}
   multica_pc_online: {by: 用户登录及自动更新、本地Codex修正并独立复核, checked_at: "2026-10-30T19:24:34.776068+08:00", method: 安装官方稳定Codex CLI、核对登录状态，由Windows桌面重启后查询专属daemon及后端runtime，读取脱敏注册／WebSocket和心跳日志, scope: Desktop及daemon0.7.2、后端0.7.1，PC Codex0.166.0注册online且WS持续确认；只完成连接与注册阶段，未运行模型任务，CodeBuddy／Kimi和服务器daemon未验收，未修改服务器配置}
   multica_pc_desktop_setup: {by: 用户安装、本地Codex配置并独立核对, checked_at: "2026-10-30T18:11:40.110801+08:00", method: 核对PC安装版本、写入并回读桌面端desktop.json，启动应用并查询其独立profile状态，正常DNS下访问后端HTTPS, scope: Desktop0.7.1已连接自托管配置并生成独立profile，health与api/config均200；查询时daemon为stopped，登录及实际任务尚未验收，未读取凭据或另起CLI daemon}
   multica_guard_acceptance: {by: 用户应用、本地Codex独立复核, checked_at: "2026-10-30T17:57:22.663142+08:00", client_checked_at: "2026-10-30T17:57:25.923813+08:00", method: 回读正式Caddyfile及生效HTTP配置，核对拒绝顺序并实测LAN／非LAN访问，Windows直连和Squid回归, scope: Caddy哈希与用户一致、无格式警告、LAN拒绝先于所有Multica代理；非LAN首页／health／ws及其子路径均403，LAN页面及API200且证书有效，Squid及旧三个服务正常；只完成入口配置阶段，两个临时目录清理、账号登录和真实WebSocket未确认}
@@ -676,7 +677,7 @@ services:
       public_route: 本次未创建Multica公网443站点
     access_pending: 用户已完成桌面端登录，PC daemon认证WebSocket已通过；关闭新注册、界面实时变更和任务执行仍未验收
     pc_desktop:
-      source: [multica_pc_desktop_setup, multica_pc_online]
+      source: [multica_pc_desktop_setup, multica_pc_online, multica_pc_codebuddy_installed]
       version: 0.7.2
       config: "%USERPROFILE%/.multica/desktop.json"
       schema_version: 1
@@ -692,11 +693,19 @@ services:
         login: CLI只读状态确认已使用ChatGPT登录，未输出凭据
         runtime: 后端查询为online、private、无共享；不以runtime私有替代文件访问权限约束
         maintenance: nodejs为NVM目录入口；切换Node版本后应重新核对CLI安装和发现，不能假定跨版本仍存在
-      daemon: {version: 0.7.2, status: running, launched_by: desktop, agents: [codex], websocket: connected且持续收到心跳确认, verified_after_desktop_restart: true}
-      other_tools: CodeBuddy／Kimi未接入验收；未因用户希望接入就记录为已安装或已登录
+      daemon: {version: 0.7.2, status: running, launched_by: desktop, agents: [codex, codebuddy], websocket: connected且持续收到心跳确认, verified_after_desktop_restart: true}
+      codebuddy:
+        source: [multica_pc_codebuddy_installed]
+        version: 2.178.1
+        latest_checked: "2026-10-30"
+        install: 官方npm_registry的@tencent-ai/codebuddy-code正式latest，安装时固定核对后的版本
+        command: E:/softwares/nodejs/codebuddy.cmd
+        discovery: Desktop自动发现且后端runtime为online，无需为本次工具发现重启Desktop
+        authentication: Pending verification，安装及runtime在线不等于账号认证或模型调用成功
+      other_tools: Kimi未接入验收
       version_scope: 已验证Desktop／daemon0.7.2连接后端0.7.1的认证、注册和WS基础链路，不代表全部功能跨版本兼容或后端已升级
       acceptance_pending: 明确任务目录和操作权限后验证实际任务执行及回传，继续接入其余已确定工具；Windows登录自启未单独核验
-    runtime_state: PC桌面端及Codex连接／登录／注册阶段通过；PC实际任务执行、CodeBuddy／Kimi及服务器daemon仍待验收
+    runtime_state: PC桌面端及Codex连接／登录／注册阶段通过，CodeBuddy安装和发现通过；PC实际任务、CodeBuddy认证、Kimi及服务器daemon仍待验收
     cleanup: 用户已确认原multica-platform准备目录及两文件清理；multica-entry和multica-guard的入口配置用途已完成，达到清理条件，已交付精确文件及空目录删除命令；结果待用户确认，不等账号或runtime接入
 
   squid:

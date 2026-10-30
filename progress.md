@@ -38,7 +38,7 @@
 
 - [x] **08 阶段：Multica基础容器与LAN入口配置**：2026-10-30用户部署v0.7.1并修正Caddy来源限制的执行顺序；本地独立核对数据库及迁移就绪、可信HTTPS／API和Squid访问正常，非LAN首页／API／WebSocket路径403，既有服务回归通过。原准备目录已按用户输出确认清理，两个入口临时目录已达到清理条件、结果待确认。账号登录、真实WebSocket、关闭新注册及两端runtime仍属于任务08未完成范围。
 
-- [x] **08 阶段：PC Desktop登录与Codex运行时连接**：2026-10-30用户确认登录并更新至0.7.2；本地修正独立CLI发现、确认Codex0.166.0已登录，由Windows桌面重开后daemon持续运行，后端确认Codex在线，认证WebSocket及心跳正常。只完成PC连接／注册阶段，实际任务、其他工具、Windows登录自启及服务器daemon仍待验收；后端保持0.7.1。
+- [x] **08 阶段：PC Desktop登录与Codex运行时连接**：2026-10-30用户确认登录并更新至0.7.2；本地修正独立CLI发现、确认Codex0.166.0已登录，由Windows桌面重开后daemon持续运行，后端确认Codex在线，认证WebSocket及心跳正常。只完成PC连接／注册阶段，随后CodeBuddy2.178.1安装／发现由本地核对、登录由用户确认；实际任务、Kimi、Windows登录自启及服务器daemon仍待验收；后端保持0.7.1。
 
 ## 未完成
 
@@ -217,7 +217,7 @@
 
   - [ ] **服务器daemon与运行时**：已完成只读预检及安装命令准备，服务器尚未执行。交付方案采用新建`multica-runner`账号，不授予sudo／Docker权限；系统Node/npm及账号由用户创建，Multica0.7.2、Codex0.166.0和CodeBuddy2.178.1安装至`/home/multica-runner/.local/bin`。同机API用`http://127.0.0.1:13011`，浏览器入口仍为`https://multica.<DOMAIN>:4129`，无需为安装更改DNS或端口。分别登录CLI并交互输入Multica_PAT，配置systemd用户服务与linger；实际任务前明确可读写目录和操作权限，验证任务执行／回传及自启保持。下载临时目录`/tmp/home-server-ops/multica-server-cli-20261030-01/`仅保存已校验发行包及解压出的二进制，安装版本检查通过后精确清理；home中的CLI和认证目录是持久状态。角色Instructions不替代系统权限，不把Multica自动应答当作人工授权。
 
-  - [ ] **Windows PC daemon与运行时**：用户已登录并自动更新Desktop至0.7.2；本地修正持久CLI发现，安装官方Codex0.166.0至既有Node目录，确认ChatGPT登录。由Windows桌面重开后，Desktop管理的daemon0.7.2运行，后端0.7.1确认Codex runtime为online，认证WebSocket及持续心跳通过；仅完成连接／登录／注册阶段，未运行模型任务。明确任务目录和操作权限后验证实际执行及回传，CodeBuddy已安装当前正式版2.178.1，Desktop自动发现且后端注册在线，账号认证和模型调用待验收；Kimi仍待接入；Windows登录自启未单独核验。桌面端使用独立profile，不额外启动重复CLI daemon；Node版本切换后重新核对CLI发现。PC结果不替代服务器接入。
+  - [ ] **Windows PC daemon与运行时**：用户已登录并自动更新Desktop至0.7.2；本地修正持久CLI发现，安装官方Codex0.166.0至既有Node目录，确认ChatGPT登录。由Windows桌面重开后，Desktop管理的daemon0.7.2运行，后端0.7.1确认Codex runtime为online，认证WebSocket及持续心跳通过；仅完成连接／登录／注册阶段，未运行模型任务。明确任务目录和操作权限后验证实际执行及回传，CodeBuddy已安装当前正式版2.178.1，Desktop自动发现且后端注册在线，用户已明确确认完成账号登录；模型调用待验收；Kimi仍待接入；Windows登录自启未单独核验。桌面端使用独立profile，不额外启动重复CLI daemon；Node版本切换后重新核对CLI发现。PC结果不替代服务器接入。
 
   约束：沿用部署、Caddy格式、登录Shell及临时目录规范。准备目录`/tmp/home-server-ops/multica-platform-20261030-01/`已按用户成功输出确认清理；入口目录`/tmp/home-server-ops/multica-entry-20261030-01/`和修正目录`/tmp/home-server-ops/multica-guard-20261030-01/`已完成用途，本轮交付精确清理命令、等待用户结果；不等账号或运行时接入；正式数据不作为临时文件清理。现有入口配置已较旧快照变化，接入前必须读取完整现行文件；私密配置及邮箱不公开。任务派发、验收和Git归档规则在平台可用后配置，不提前迁移或关闭其他任务。
 
